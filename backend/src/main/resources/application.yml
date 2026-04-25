@@ -60,6 +60,8 @@ oauth:
     redirect-uri: ${KAKAO_REDIRECT_URI}
   google:
     redirect-uri: ${GOOGLE_REDIRECT_URI}
+    android-client-id: ${GOOGLE_ANDROID_CLIENT_ID}
+    ios-client-id: ${GOOGLE_IOS_CLIENT_ID}
 
 springdoc:
   swagger-ui:
