@@ -5,7 +5,7 @@ type IconName =
   | 'book' | 'home' | 'swap' | 'chat' | 'user' | 'search'
   | 'bell' | 'heart' | 'bookmark' | 'check' | 'plus'
   | 'chevronRight' | 'chevronDown' | 'star' | 'location'
-  | 'close' | 'filter' | 'settings' | 'logOut';
+  | 'close' | 'filter' | 'settings' | 'logOut' | 'send';
 
 interface PMIconProps {
   name: IconName;
@@ -156,6 +156,13 @@ const PMIcon: React.FC<PMIconProps> = ({
       return (
         <Svg {...props}>
           <Path d="M22 3H2l8 9.5V19l4 2v-8.5z" stroke={stroke} strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" />
+        </Svg>
+      );
+    case 'send':
+      return (
+        <Svg {...props}>
+          <Path d="M22 2 11 13" stroke={stroke} strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" />
+          <Path d="M22 2 15 22 11 13 2 9l20-7z" stroke={stroke} strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" />
         </Svg>
       );
     default:

@@ -1,6 +1,18 @@
 {
-  "plugins": [
-    "expo-router",
-    "expo-asset"
-  ]
+  "expo": {
+    "name": "PageMate",
+    "slug": "pagemate",
+    "version": "1.0.0",
+    "scheme": "pagemate",
+    "platforms": ["ios", "android", "web"],
+    "web": {
+      "bundler": "metro",
+      "output": "single"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-asset",
+      "expo-secure-store"
+    ]
+  }
 }
