@@ -49,6 +49,10 @@ public class JwtProvider {
         return Long.parseLong(parseClaims(token).getSubject());
     }
 
+    public long getAccessExpiresIn() {
+        return accessExpiration / 1000L;
+    }
+
     public boolean isValid(String token) {
         try {
             parseClaims(token);
