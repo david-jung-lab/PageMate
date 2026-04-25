@@ -2,9 +2,41 @@ import React, { useState } from 'react';
 import {
   View, Text, TouchableOpacity, Image, StyleSheet, LayoutChangeEvent,
 } from 'react-native';
-import PMBookCover from './PMBookCover';
-import PMIcon from './PMIcon';
-import { BookSummary } from '../../features/books/types';
+import Svg, { Path, Circle } from 'react-native-svg';
+import { BookSummary, CoverColor } from '../../features/books/types';
+
+const C = {
+  card:  '#FFFFFF',
+  text:  '#1A1D24',
+  text2: '#5C6270',
+  text3: '#9097A3',
+  line:  '#ECEEF2',
+  line2: '#F0F2F6',
+} as const;
+
+const COVER_PALETTE: Record<CoverColor, { bg: string; fg: string }> = {
+  blue:   { bg: '#2C3E6B', fg: '#FFFFFF' },
+  orange: { bg: '#EFE4D0', fg: '#6B5230' },
+  sage:   { bg: '#355238', fg: '#E8DDB0' },
+  plum:   { bg: '#7A4F6A', fg: '#FFFFFF' },
+  sand:   { bg: '#F4F1E8', fg: '#1A1D24' },
+  ink:    { bg: '#3A3E59', fg: '#FFFFFF' },
+};
+
+const PinIcon = ({ size = 10, color = C.text3 }: { size?: number; color?: string }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Path
+      d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"
+      stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"
+    />
+    <Circle cx={12} cy={10} r={3} stroke={color} strokeWidth={2} />
+  </Svg>
+);
+
+function formatDist(d: number | null): string {
+  if (d == null) return '근처';
+  return d < 1 ? `${Math.round(d * 1000)}m` : `${d.toFixed(1)}km`;
+}
 
 interface PMBookCardProps {
   book: BookSummary;
@@ -19,9 +51,12 @@ const PMBookCard: React.FC<PMBookCardProps> = ({ book, onPress }) => {
     if (w > 0 && w !== cardW) setCardW(w);
   };
 
-  // cover = 70% of card inner area (card padding 12px * 2 = 24px)
-  const coverW = cardW > 0 ? Math.round((cardW - 24) * 0.70) : 0;
-  const coverH = coverW > 0 ? Math.round(coverW * 1.45) : 0;
+  // 홈 NearBookCard 비율 그대로 (card 155 → book 104×155, imageArea 200)
+  const bookW      = cardW > 0 ? Math.round(cardW * 0.67) : 0;
+  const bookH      = cardW > 0 ? Math.round(cardW * 1.00) : 0;
+  const imageAreaH = cardW > 0 ? Math.round(cardW * 1.29) : 0;
+
+  const { bg, fg } = COVER_PALETTE[book.coverColor] ?? COVER_PALETTE.blue;
 
   return (
     <TouchableOpacity
@@ -30,41 +65,34 @@ const PMBookCard: React.FC<PMBookCardProps> = ({ book, onPress }) => {
       onPress={onPress}
       activeOpacity={0.85}
     >
-      {/* 표지 컨테이너 */}
-      <View style={styles.coverContainer}>
-        {coverW > 0 && (
-          <View style={[styles.coverWrap, { width: coverW, height: coverH }]}>
-            {book.imageUrl ? (
-              <Image
-                source={{ uri: book.imageUrl }}
-                style={styles.coverImg}
-                resizeMode="cover"
-              />
-            ) : (
-              <PMBookCover
-                title={book.title}
-                author={book.author}
-                color={book.coverColor}
-                width={coverW}
-                height={coverH}
-              />
-            )}
+      {/* 회색 표지 배경 영역 */}
+      <View style={[styles.imageArea, imageAreaH > 0 && { height: imageAreaH }]}>
+        {bookW > 0 && (
+          // 그림자용 outer (overflow 없음)
+          <View style={[styles.bookShadow, { width: bookW, height: bookH }]}>
+            {/* 클리핑용 inner */}
+            <View style={[styles.bookInner, { width: bookW, height: bookH }]}>
+              {book.imageUrl ? (
+                <Image source={{ uri: book.imageUrl }} style={styles.bookImage} resizeMode="cover" />
+              ) : (
+                <View style={[styles.bookPlaceholder, { backgroundColor: bg }]}>
+                  <Text style={[styles.bookPTitle, { color: fg }]} numberOfLines={3}>{book.title}</Text>
+                  <Text style={[styles.bookPAuthor, { color: fg }]} numberOfLines={2}>{book.author}</Text>
+                </View>
+              )}
+            </View>
           </View>
         )}
       </View>
 
       {/* 텍스트 영역 */}
-      <View style={styles.textArea}>
-        <Text style={styles.title} numberOfLines={2}>{book.title}</Text>
+      <View style={styles.meta}>
+        <Text style={styles.title} numberOfLines={1}>{book.title}</Text>
         <Text style={styles.author} numberOfLines={1}>{book.author}</Text>
-        <View style={styles.distanceRow}>
-          <PMIcon name="location" size={11} color="#9CA3AF" />
-          <Text style={styles.distanceText}>
-            {book.distance != null
-              ? book.distance < 1
-                ? `${Math.round(book.distance * 1000)}m`
-                : `${book.distance.toFixed(1)}km`
-              : '위치 정보 없음'}
+        <View style={styles.locRow}>
+          <PinIcon />
+          <Text style={styles.locText}>
+            {formatDist(book.distance)} · {book.owner.nickname}
           </Text>
         </View>
       </View>
@@ -75,95 +103,61 @@ const PMBookCard: React.FC<PMBookCardProps> = ({ book, onPress }) => {
 const styles = StyleSheet.create({
   card: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: C.card,
     borderRadius: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 3,
     borderWidth: 1,
-    borderColor: '#D8D8D4',
+    borderColor: C.line,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 2,
+    overflow: 'hidden',
   },
 
-  /* 표지 컨테이너 - 회색 배경, 여백 */
-  coverContainer: {
-    backgroundColor: '#F5F5F3',
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    borderBottomLeftRadius: 0,
-    borderBottomRightRadius: 0,
-    paddingVertical: 20,
-    paddingHorizontal: 16,
+  imageArea: {
+    height: 180,
+    borderTopLeftRadius: 14,
+    borderTopRightRadius: 14,
+    backgroundColor: C.line2,
     alignItems: 'center',
     justifyContent: 'center',
   },
 
-  /* 표지 자체 */
-  coverWrap: {
+  bookShadow: {
+    borderRadius: 8,
+    shadowColor: '#1A1D24',
+    shadowOffset: { width: 2, height: 8 },
+    shadowOpacity: 0.22,
+    shadowRadius: 12,
+    elevation: 10,
+  },
+
+  bookInner: {
     borderRadius: 8,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
-    elevation: 4,
-  },
-  coverImg: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 8,
   },
 
-  /* 상태 뱃지 */
-  condBadge: {
-    position: 'absolute',
-    top: 6,
-    left: 6,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#10B981',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  condBadgeText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#fff',
-  },
+  bookImage: { width: '100%', height: '100%' },
 
-  /* 텍스트 영역 */
-  textArea: {
+  bookPlaceholder: {
+    flex: 1,
+    padding: 12,
+    justifyContent: 'space-between',
+  },
+  bookPTitle:  { fontSize: 15, fontWeight: '700', letterSpacing: -0.3, lineHeight: 21, color: '#fff' },
+  bookPAuthor: { fontSize: 11, opacity: 0.8, letterSpacing: -0.2, color: '#fff' },
+
+  meta: {
+    paddingHorizontal: 14,
     paddingTop: 12,
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingBottom: 14,
+    gap: 4,
   },
-  title: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#1A1A2E',
-    lineHeight: 20,
-    paddingBottom: 10,
-  },
-  author: {
-    fontSize: 12,
-    color: '#6B7280',
-    lineHeight: 18,
-    marginTop: 5,
-  },
-  distanceRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
-    marginTop: 8,
-  },
-  distanceText: {
-    fontSize: 11,
-    lineHeight: 11,
-    color: '#9CA3AF',
-    includeFontPadding: false,
-  },
+  title:  { fontSize: 14, fontWeight: '700', color: C.text,  letterSpacing: -0.3 },
+  author: { fontSize: 12, color: C.text2, letterSpacing: -0.2, marginBottom: 2 },
+  locRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  locText:{ fontSize: 12, color: C.text3 },
 });
 
 export default PMBookCard;
