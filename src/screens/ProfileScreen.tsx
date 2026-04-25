@@ -222,9 +222,7 @@ const SettingsItem: React.FC<SettingsItemProps> = ({
       styles.settingsIcon,
       { backgroundColor: danger ? colors.dangerSoft : colors.primarySoft },
     ]}>
-      <View style={{ tintColor: danger ? colors.danger : colors.primary }}>
-        {icon}
-      </View>
+      {icon}
     </View>
     <View style={styles.settingsMeta}>
       <Text style={[styles.settingsTitle, danger && { color: colors.danger }]}>{title}</Text>
