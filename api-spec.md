@@ -9,6 +9,89 @@
 
 ---
 
+## 외부 도서 검색 API — 카카오 도서 검색
+
+> 도서 등록 시 제목/저자 키워드로 책을 검색하여 정보를 자동 완성하는 데 사용합니다.
+> **FE에 API 키 노출 방지를 위해 BE가 프록시합니다.**
+
+### 카카오 도서 검색 API 스펙
+
+| 항목 | 내용 |
+|------|------|
+| 원본 엔드포인트 | `GET https://dapi.kakao.com/v3/search/book` |
+| 인증 | `Authorization: KakaoAK {REST_API_KEY}` (BE 서버에서만 보유) |
+| 일일 한도 | 300,000건 |
+| 데이터 | 제목, 저자, ISBN, 출판사, 표지 이미지 URL, 줄거리 |
+
+### PageMate 프록시 엔드포인트
+
+#### GET `/books/search/kakao` — 카카오 도서 검색 (프록시)
+
+**Headers** — `Authorization` 필요
+
+**Query Parameters**
+| 파라미터 | 타입 | 필수 | 설명 |
+|---------|------|------|------|
+| `query` | string | Y | 검색어 (제목, 저자 키워드) |
+| `page` | int | N | 페이지 번호 (기본값: 1) |
+| `size` | int | N | 결과 수 (기본값: 10, 최대: 50) |
+
+**Response**
+```json
+{
+  "success": true,
+  "data": {
+    "books": [
+      {
+        "title": "채식주의자",
+        "authors": ["한강"],
+        "publisher": "창비",
+        "isbn": "9788936433598",
+        "thumbnail": "https://search1.kakaocdn.net/thumb/R120x174.q85/?fname=...",
+        "contents": "줄거리 요약...",
+        "datetime": "2007-10-30"
+      }
+    ],
+    "totalCount": 3,
+    "isEnd": true
+  }
+}
+```
+
+### 도서 등록 UX 흐름
+
+```
+[도서 등록 화면]
+├── 📷 바코드 스캔 (expo-camera)
+│       → ISBN 자동 추출 → query로 검색
+└── 🔍 제목/저자 키워드 입력
+        ↓
+GET /books/search/kakao?query={keyword}
+        ↓
+검색 결과 목록에서 선택
+        ↓
+자동 완성: 제목, 저자, 출판사, thumbnail URL
+        ↓
+사용자 직접 입력: 도서 상태, 한줄 소개, (선택) 직접 촬영한 사진
+        ↓
+POST /books  ← thumbnail URL을 image_url로 저장 (파일 복사 X)
+```
+
+### 표지 이미지 저장 정책
+
+- 카카오 `thumbnail` URL을 DB에 **URL 그대로 저장** (이미지 파일 S3 복사 금지 — 약관)
+- 사용자가 직접 촬영한 사진은 S3에 업로드하여 저장 (우선순위 높음)
+- FE에서 이미지 로드 실패 시 기본 표지 placeholder로 fallback 처리
+
+```
+image_url 우선순위:
+1. 사용자 직접 업로드 이미지 (S3 URL)
+2. 카카오 thumbnail URL
+3. 기본 placeholder 이미지
+```
+
+---
+
 ## 공통 응답 포맷
 
 ```json
