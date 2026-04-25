@@ -8,4 +8,6 @@ public class OAuthRequest {
 
     @NotBlank
     private String authorizationCode;
+
+    private String redirectUri;
 }

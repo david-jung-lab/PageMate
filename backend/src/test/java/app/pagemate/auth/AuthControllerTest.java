@@ -17,6 +17,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.Map;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -37,9 +38,9 @@ class AuthControllerTest {
 
     @BeforeEach
     void setUp() {
-        when(kakaoOAuthClient.getUserInfo(anyString()))
+        when(kakaoOAuthClient.getUserInfo(anyString(), any()))
                 .thenReturn(new KakaoOAuthClient.UserInfo("kakao_test_888", "카카오유저", "https://k.kakao.com/photo.jpg"));
-        when(googleOAuthClient.getUserInfo(anyString()))
+        when(googleOAuthClient.getUserInfo(anyString(), any()))
                 .thenReturn(new GoogleOAuthClient.UserInfo("google_test_888", "구글유저", "https://lh3.google.com/photo.jpg"));
     }
 

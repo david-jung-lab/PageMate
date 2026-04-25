@@ -24,14 +24,14 @@ public class AuthService {
     private final GoogleOAuthClient googleOAuthClient;
 
     @Transactional
-    public AuthResponse loginWithKakao(String authorizationCode) {
-        KakaoOAuthClient.UserInfo info = kakaoOAuthClient.getUserInfo(authorizationCode);
+    public AuthResponse loginWithKakao(String authorizationCode, String redirectUri) {
+        KakaoOAuthClient.UserInfo info = kakaoOAuthClient.getUserInfo(authorizationCode, redirectUri);
         return processLogin(OAuthProvider.KAKAO, info.oauthId(), info.nickname(), info.profileImage());
     }
 
     @Transactional
-    public AuthResponse loginWithGoogle(String authorizationCode) {
-        GoogleOAuthClient.UserInfo info = googleOAuthClient.getUserInfo(authorizationCode);
+    public AuthResponse loginWithGoogle(String authorizationCode, String redirectUri) {
+        GoogleOAuthClient.UserInfo info = googleOAuthClient.getUserInfo(authorizationCode, redirectUri);
         return processLogin(OAuthProvider.GOOGLE, info.oauthId(), info.nickname(), info.profileImage());
     }
 

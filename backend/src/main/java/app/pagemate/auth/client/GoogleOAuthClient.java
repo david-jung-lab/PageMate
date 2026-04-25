@@ -33,21 +33,21 @@ public class GoogleOAuthClient {
         this.restClient = RestClient.create();
     }
 
-    public UserInfo getUserInfo(String authorizationCode) {
+    public UserInfo getUserInfo(String authorizationCode, String overrideRedirectUri) {
         try {
-            String googleAccessToken = getAccessToken(authorizationCode);
+            String googleAccessToken = getAccessToken(authorizationCode, overrideRedirectUri);
             return fetchUserInfo(googleAccessToken);
         } catch (RestClientException e) {
             throw new PagemateException(ErrorCode.UNAUTHORIZED);
         }
     }
 
-    private String getAccessToken(String authorizationCode) {
+    private String getAccessToken(String authorizationCode, String overrideRedirectUri) {
         MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
         params.add("code", authorizationCode);
         params.add("client_id", clientId);
         params.add("client_secret", clientSecret);
-        params.add("redirect_uri", redirectUri);
+        params.add("redirect_uri", overrideRedirectUri != null ? overrideRedirectUri : redirectUri);
         params.add("grant_type", "authorization_code");
 
         TokenResponse response = restClient.post()

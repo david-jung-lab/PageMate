@@ -18,12 +18,12 @@ public class AuthController {
 
     @PostMapping("/oauth/kakao")
     public ApiResponse<AuthResponse> kakaoLogin(@Valid @RequestBody OAuthRequest request) {
-        return ApiResponse.ok(authService.loginWithKakao(request.getAuthorizationCode()));
+        return ApiResponse.ok(authService.loginWithKakao(request.getAuthorizationCode(), request.getRedirectUri()));
     }
 
     @PostMapping("/oauth/google")
     public ApiResponse<AuthResponse> googleLogin(@Valid @RequestBody OAuthRequest request) {
-        return ApiResponse.ok(authService.loginWithGoogle(request.getAuthorizationCode()));
+        return ApiResponse.ok(authService.loginWithGoogle(request.getAuthorizationCode(), request.getRedirectUri()));
     }
 
     @PostMapping("/refresh")

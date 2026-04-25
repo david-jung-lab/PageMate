@@ -3,6 +3,7 @@ package app.pagemate.auth.client;
 import app.pagemate.common.exception.ErrorCode;
 import app.pagemate.common.exception.PagemateException;
 import lombok.Getter;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -12,6 +13,7 @@ import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
+@Slf4j
 @Component
 public class KakaoOAuthClient {
 
@@ -34,22 +36,26 @@ public class KakaoOAuthClient {
         this.restClient = RestClient.create();
     }
 
-    public UserInfo getUserInfo(String authorizationCode) {
+    public UserInfo getUserInfo(String authorizationCode, String overrideRedirectUri) {
         try {
-            String kakaoAccessToken = getAccessToken(authorizationCode);
+            String kakaoAccessToken = getAccessToken(authorizationCode, overrideRedirectUri);
             return fetchUserInfo(kakaoAccessToken);
         } catch (RestClientException e) {
+            log.error("[Kakao] 토큰 교환 실패: {}", e.getMessage());
             throw new PagemateException(ErrorCode.UNAUTHORIZED);
         }
     }
 
-    private String getAccessToken(String authorizationCode) {
+    private String getAccessToken(String authorizationCode, String overrideRedirectUri) {
         MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
         params.add("grant_type", "authorization_code");
         params.add("client_id", clientId);
-        params.add("client_secret", clientSecret);
-        params.add("redirect_uri", redirectUri);
+        if (clientSecret != null && !clientSecret.isBlank()) {
+            params.add("client_secret", clientSecret);
+        }
+        params.add("redirect_uri", overrideRedirectUri != null ? overrideRedirectUri : redirectUri);
         params.add("code", authorizationCode);
+        log.debug("[Kakao] 토큰 요청 redirect_uri={}", overrideRedirectUri != null ? overrideRedirectUri : redirectUri);
 
         TokenResponse response = restClient.post()
                 .uri(TOKEN_URL)
