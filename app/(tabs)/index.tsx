@@ -379,8 +379,8 @@ const s = StyleSheet.create({
     backgroundColor: C.bg,
   },
   logo: {
-    height: 24,
-    width: 120,
+    height: 36,
+    width: 128,
   },
   bell: {
     width: 36,
