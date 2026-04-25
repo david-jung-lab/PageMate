@@ -3,9 +3,9 @@ spring:
     active: local
 
   datasource:
-    url: jdbc:mysql://localhost:3306/pagemate?useSSL=false&serverTimezone=Asia/Seoul&allowPublicKeyRetrieval=true
-    username: ${DB_USERNAME:root}
-    password: ${DB_PASSWORD:}
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
 
   jpa:
@@ -54,6 +54,12 @@ aws:
 kakao:
   api-key: ${KAKAO_REST_API_KEY}
   book-search-url: https://dapi.kakao.com/v3/search/book
+
+oauth:
+  kakao:
+    redirect-uri: ${KAKAO_REDIRECT_URI}
+  google:
+    redirect-uri: ${GOOGLE_REDIRECT_URI}
 
 springdoc:
   swagger-ui:
