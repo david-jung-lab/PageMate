@@ -4,15 +4,26 @@
     "slug": "pagemate",
     "version": "1.0.0",
     "scheme": "pagemate",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
     "platforms": ["ios", "android", "web"],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "app.pagemate"
+    },
+    "android": {
+      "package": "app.pagemate"
+    },
     "web": {
       "bundler": "metro",
       "output": "single"
     },
     "plugins": [
       "expo-router",
-      "expo-asset",
       "expo-secure-store"
-    ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
   }
 }

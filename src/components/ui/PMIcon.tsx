@@ -1,10 +1,10 @@
-import React from 'react';
+﻿import React from 'react';
 import Svg, { Path, Circle } from 'react-native-svg';
 
 type IconName =
   | 'book' | 'home' | 'swap' | 'chat' | 'user' | 'search'
   | 'bell' | 'heart' | 'bookmark' | 'check' | 'plus'
-  | 'chevronRight' | 'chevronDown' | 'star' | 'location'
+  | 'chevronLeft' | 'chevronRight' | 'chevronDown' | 'star' | 'location'
   | 'close' | 'filter' | 'settings' | 'logOut' | 'send';
 
 interface PMIconProps {
@@ -85,6 +85,12 @@ const PMIcon: React.FC<PMIconProps> = ({
         <Svg {...props}>
           <Path d="M12 5v14" stroke={stroke} strokeWidth={sw} strokeLinecap="round" />
           <Path d="M5 12h14" stroke={stroke} strokeWidth={sw} strokeLinecap="round" />
+        </Svg>
+      );
+    case 'chevronLeft':
+      return (
+        <Svg {...props}>
+          <Path d="m15 18-6-6 6-6" stroke={stroke} strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" />
         </Svg>
       );
     case 'chevronRight':

@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, Image, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { bookCoverPalettes } from '../../theme/tokens';
 
@@ -7,6 +7,7 @@ interface PMBookCoverProps {
   title: string;
   author: string;
   color?: string;
+  imageUrl?: string;
   width?: number;
   height?: number;
 }
@@ -15,9 +16,20 @@ const PMBookCover: React.FC<PMBookCoverProps> = ({
   title,
   author,
   color = 'sage',
+  imageUrl,
   width = 80,
   height = 116,
 }) => {
+  if (imageUrl) {
+    return (
+      <Image
+        source={{ uri: imageUrl }}
+        style={[styles.cover, { width, height }]}
+        resizeMode="cover"
+      />
+    );
+  }
+
   const palette = bookCoverPalettes[color] ?? bookCoverPalettes.sage;
   const isLarge = width > 90;
 
@@ -28,7 +40,6 @@ const PMBookCover: React.FC<PMBookCoverProps> = ({
       end={{ x: 1, y: 1 }}
       style={[styles.cover, { width, height }]}
     >
-      {/* Spine accent */}
       <View style={styles.spine} />
       <Text style={[styles.title, { fontSize: isLarge ? 13 : 11 }]} numberOfLines={4}>
         {title}

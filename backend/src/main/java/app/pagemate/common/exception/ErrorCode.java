@@ -37,6 +37,10 @@ public enum ErrorCode {
     READING_RECORD_NOT_FOUND("독서 기록을 찾을 수 없습니다.", HttpStatus.NOT_FOUND),
     READING_RECORD_ACCESS_DENIED("본인 독서 기록만 수정·삭제할 수 있습니다.", HttpStatus.FORBIDDEN),
 
+    // Notification
+    NOTIFICATION_NOT_FOUND("알림을 찾을 수 없습니다.", HttpStatus.NOT_FOUND),
+    NOTIFICATION_ACCESS_DENIED("본인 알림에만 접근할 수 있습니다.", HttpStatus.FORBIDDEN),
+
     // Common
     VALIDATION_ERROR("요청 값 검증에 실패했습니다.", HttpStatus.BAD_REQUEST),
     NOT_FOUND("리소스를 찾을 수 없습니다.", HttpStatus.NOT_FOUND),

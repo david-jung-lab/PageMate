@@ -1,13 +1,14 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, Image, StyleSheet } from 'react-native';
 import { radius } from '../../theme/tokens';
 
-type AvatarColor = 'blue' | 'orange' | 'sage' | 'plum' | 'sand' | 'ink';
+export type AvatarColor = 'blue' | 'orange' | 'sage' | 'plum' | 'sand' | 'ink';
 
 interface PMAvatarProps {
   name: string;
   size?: number;
-  color?: AvatarColor;
+  color?: AvatarColor | string;
+  imageUrl?: string;
 }
 
 const palette: Record<AvatarColor, string> = {
@@ -19,18 +20,21 @@ const palette: Record<AvatarColor, string> = {
   ink: '#2A3340',
 };
 
-const PMAvatar: React.FC<PMAvatarProps> = ({ name, size = 40, color = 'blue' }) => {
+const PMAvatar: React.FC<PMAvatarProps> = ({ name, size = 40, color = 'blue', imageUrl }) => {
   const initial = (name || '?').trim()[0];
+  const bg = palette[color as AvatarColor] ?? palette.blue;
+
+  if (imageUrl) {
+    return (
+      <Image
+        source={{ uri: imageUrl }}
+        style={[styles.base, { width: size, height: size, borderRadius: radius.full }]}
+      />
+    );
+  }
+
   return (
-    <View style={[
-      styles.base,
-      {
-        width: size,
-        height: size,
-        borderRadius: radius.full,
-        backgroundColor: palette[color] ?? palette.blue,
-      },
-    ]}>
+    <View style={[styles.base, { width: size, height: size, borderRadius: radius.full, backgroundColor: bg }]}>
       <Text style={[styles.text, { fontSize: size * 0.4 }]}>
         {initial}
       </Text>
