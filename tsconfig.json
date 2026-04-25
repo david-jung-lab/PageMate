@@ -1,7 +1,9 @@
 {
   "compilerOptions": {
     "target": "ESNext",
-    "lib": ["ESNext"],
+    "lib": [
+      "ESNext"
+    ],
     "allowJs": true,
     "skipLibCheck": true,
     "strict": true,
@@ -12,8 +14,14 @@
     "isolatedModules": true,
     "jsx": "react-native",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": [
+        "./src/*"
+      ]
     }
   },
-  "include": ["src/**/*", "app/**/*"]
+  "include": [
+    "src/**/*",
+    "app/**/*"
+  ],
+  "extends": "expo/tsconfig.base"
 }
