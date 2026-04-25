@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -11,10 +11,13 @@ import {
   Platform,
   KeyboardAvoidingView,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
+import * as Location from 'expo-location';
 import Svg, { Path, Circle } from 'react-native-svg';
 import { router } from 'expo-router';
 import { profileApi } from '@/features/profile/api';
+import { locationApi, LocationResult } from '@/features/locations/api';
 import { colors, radius, spacing, fontSize } from '@/theme/tokens';
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
@@ -55,6 +58,27 @@ const CheckIcon = ({ size = 14, color = '#FFFFFF' }: { size?: number; color?: st
       strokeLinecap="round"
       strokeLinejoin="round"
     />
+  </Svg>
+);
+
+const CrosshairIcon = ({ size = 18, color = colors.primary }: { size?: number; color?: string }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Circle cx="12" cy="12" r="10" stroke={color} strokeWidth="2" />
+    <Path d="M12 2v4M12 18v4M2 12h4M18 12h4" stroke={color} strokeWidth="2" strokeLinecap="round" />
+    <Circle cx="12" cy="12" r="2" fill={color} />
+  </Svg>
+);
+
+const LocationPinIcon = ({ size = 14, color = colors.primary }: { size?: number; color?: string }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill={color}>
+    <Path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" />
+  </Svg>
+);
+
+const SearchIcon = ({ size = 18, color = colors.textTertiary }: { size?: number; color?: string }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Circle cx="11" cy="11" r="8" stroke={color} strokeWidth="2" />
+    <Path d="m21 21-4.35-4.35" stroke={color} strokeWidth="2" strokeLinecap="round" />
   </Svg>
 );
 
@@ -365,7 +389,290 @@ const step1Styles = StyleSheet.create({
   },
 });
 
-// ─── Step 2: Genre selection ──────────────────────────────────────────────────
+// ─── Step 2: Active neighborhood ─────────────────────────────────────────────
+
+const Step2 = ({
+  selected,
+  onSelect,
+  onNext,
+}: {
+  selected: string | null;
+  onSelect: (loc: string) => void;
+  onNext: () => void;
+}) => {
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState<LocationResult[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [gpsLoading, setGpsLoading] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (!query.trim()) {
+      setResults([]);
+      return;
+    }
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(async () => {
+      setSearching(true);
+      try {
+        const data = await locationApi.search(query.trim());
+        setResults(data ?? []);
+      } catch {
+        setResults([]);
+      } finally {
+        setSearching(false);
+      }
+    }, 400);
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [query]);
+
+  const handleGps = async () => {
+    setGpsLoading(true);
+    try {
+      let lat: number, lng: number;
+
+      if (Platform.OS === 'web') {
+        const pos = await new Promise<{ coords: { latitude: number; longitude: number } }>(
+          (resolve, reject) => {
+            if (!('geolocation' in navigator)) {
+              reject(new Error('이 브라우저는 위치 기능을 지원하지 않아요.'));
+              return;
+            }
+            (navigator as any).geolocation.getCurrentPosition(resolve, reject, { timeout: 10000 });
+          }
+        );
+        lat = pos.coords.latitude;
+        lng = pos.coords.longitude;
+      } else {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted') {
+          Alert.alert('위치 권한 필요', '설정에서 위치 권한을 허용해주세요.');
+          return;
+        }
+        const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+        lat = pos.coords.latitude;
+        lng = pos.coords.longitude;
+      }
+
+      const result = await locationApi.reverseGeocode(lat, lng);
+      if (result) {
+        const label = result.district ? `${result.name} · ${result.district}` : result.name;
+        onSelect(label);
+        setQuery('');
+        setResults([]);
+      }
+    } catch {
+      Alert.alert('위치 오류', '현재 위치를 가져올 수 없어요.');
+    } finally {
+      setGpsLoading(false);
+    }
+  };
+
+  const handlePick = (r: LocationResult) => {
+    const label = r.district ? `${r.name} · ${r.district}` : r.name;
+    onSelect(label);
+    setQuery('');
+    setResults([]);
+  };
+
+  return (
+    <>
+      <ScrollView
+        style={step2Styles.scroll}
+        contentContainerStyle={step2Styles.content}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={step2Styles.headingBlock}>
+          <Text style={step2Styles.heading}>{'어느 동네에서\n책을 교환하실 건가요?'}</Text>
+          <Text style={step2Styles.subheading}>반경 2km 내 독자들과 책을 주고받게 돼요</Text>
+        </View>
+
+        <Pressable
+          style={({ pressed }) => [step2Styles.gpsBtn, pressed && { opacity: 0.85 }]}
+          onPress={handleGps}
+          disabled={gpsLoading}
+        >
+          {gpsLoading ? (
+            <ActivityIndicator color={colors.primary} size="small" style={{ width: 18 }} />
+          ) : (
+            <CrosshairIcon size={18} color={colors.primary} />
+          )}
+          <Text style={step2Styles.gpsBtnText}>현재 위치로 설정하기</Text>
+          <Text style={step2Styles.gpsLabel}>GPS</Text>
+        </Pressable>
+
+        {selected && (
+          <View style={step2Styles.selectedBadge}>
+            <LocationPinIcon size={14} color={colors.primary} />
+            <Text style={step2Styles.selectedText}>{selected}</Text>
+          </View>
+        )}
+
+        <View style={step2Styles.searchRow}>
+          <SearchIcon size={18} color={colors.textTertiary} />
+          <TextInput
+            style={step2Styles.searchInput}
+            value={query}
+            onChangeText={setQuery}
+            placeholder="동네 이름으로 검색"
+            placeholderTextColor={colors.textTertiary}
+            returnKeyType="search"
+            autoCorrect={false}
+          />
+          {searching && <ActivityIndicator color={colors.primary} size="small" />}
+        </View>
+
+        {results.length > 0 && (
+          <View style={step2Styles.resultList}>
+            {results.map((r, i) => (
+              <Pressable
+                key={`${r.fullAddress}-${i}`}
+                onPress={() => handlePick(r)}
+                style={({ pressed }) => [
+                  step2Styles.resultItem,
+                  i > 0 && step2Styles.resultItemBorder,
+                  pressed && { backgroundColor: colors.surface2 },
+                ]}
+              >
+                <LocationPinIcon size={16} color={colors.textTertiary} />
+                <View style={{ flex: 1 }}>
+                  <Text style={step2Styles.resultName}>{r.name}</Text>
+                  {r.district ? (
+                    <Text style={step2Styles.resultSub}>{r.district} · {r.city}</Text>
+                  ) : null}
+                </View>
+              </Pressable>
+            ))}
+          </View>
+        )}
+
+        {!searching && query.trim().length > 0 && results.length === 0 && (
+          <View style={step2Styles.emptyBox}>
+            <Text style={step2Styles.emptyText}>검색 결과가 없어요</Text>
+          </View>
+        )}
+      </ScrollView>
+
+      <PrimaryButton label="다음" onPress={onNext} disabled={!selected} />
+    </>
+  );
+};
+
+const step2Styles = StyleSheet.create({
+  scroll: { flex: 1 },
+  content: {
+    paddingHorizontal: spacing.s6,
+    paddingTop: 28,
+    paddingBottom: spacing.s6,
+    gap: 16,
+  },
+  headingBlock: { gap: 8 },
+  heading: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: colors.text,
+    letterSpacing: -0.5,
+    lineHeight: 30,
+  },
+  subheading: {
+    fontSize: fontSize.small,
+    color: colors.textSecondary,
+    letterSpacing: -0.1,
+    lineHeight: 20,
+  },
+  gpsBtn: {
+    height: 48,
+    paddingHorizontal: spacing.s4,
+    backgroundColor: colors.primarySoft,
+    borderRadius: radius.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  gpsBtnText: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.primary,
+    letterSpacing: -0.1,
+  },
+  gpsLabel: { fontSize: 11, color: colors.primary, opacity: 0.7 },
+  selectedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    alignSelf: 'flex-start',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: colors.primarySoft,
+    borderRadius: radius.full,
+  },
+  selectedText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.primary,
+    letterSpacing: -0.1,
+  },
+  searchRow: {
+    height: 48,
+    paddingHorizontal: 14,
+    backgroundColor: colors.surface,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: fontSize.body,
+    fontWeight: '500',
+    color: colors.text,
+    letterSpacing: -0.15,
+    padding: 0,
+  },
+  resultList: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    overflow: 'hidden',
+  },
+  resultItem: {
+    height: 56,
+    paddingHorizontal: spacing.s4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  resultItemBorder: {
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  resultName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.text,
+    letterSpacing: -0.1,
+  },
+  resultSub: {
+    fontSize: 12,
+    color: colors.textTertiary,
+    letterSpacing: -0.05,
+    marginTop: 1,
+  },
+  emptyBox: {
+    paddingVertical: 20,
+    alignItems: 'center',
+  },
+  emptyText: { fontSize: 13, color: colors.textTertiary },
+});
+
+// ─── Step 3: Genre selection ──────────────────────────────────────────────────
 
 interface Genre {
   id: string;
@@ -374,14 +681,14 @@ interface Genre {
 }
 
 const GENRES: Genre[] = [
-  { id: 'novel', label: '소설', emoji: '📖' },
-  { id: 'essay', label: '에세이', emoji: '🍃' },
-  { id: 'selfdev', label: '자기계발', emoji: '🌱' },
-  { id: 'biz', label: '경제경영', emoji: '📈' },
-  { id: 'humanities', label: '인문학', emoji: '🏛' },
-  { id: 'science', label: '과학', emoji: '🔬' },
-  { id: 'poetry', label: '시 / 詩', emoji: '🪶' },
-  { id: 'scifi', label: 'SF', emoji: '🚀' },
+  { id: 'novel',      label: '소설',    emoji: '📖' },
+  { id: 'essay',      label: '에세이',  emoji: '🍃' },
+  { id: 'selfdev',    label: '자기계발', emoji: '🌱' },
+  { id: 'biz',        label: '경제경영', emoji: '📈' },
+  { id: 'humanities', label: '인문학',  emoji: '🏛' },
+  { id: 'science',    label: '과학',    emoji: '🔬' },
+  { id: 'poetry',     label: '시 / 詩', emoji: '🪶' },
+  { id: 'scifi',      label: 'SF',      emoji: '🚀' },
 ];
 
 const GenreTag = ({
@@ -447,7 +754,7 @@ const genreStyles = StyleSheet.create({
   },
 });
 
-const Step2 = ({ onDone }: { onDone: (genres: string[]) => void }) => {
+const Step3 = ({ onDone }: { onDone: (genres: string[]) => void }) => {
   const [selected, setSelected] = useState(new Set<string>());
 
   const toggle = (id: string) => {
@@ -461,30 +768,27 @@ const Step2 = ({ onDone }: { onDone: (genres: string[]) => void }) => {
   return (
     <>
       <ScrollView
-        style={step2Styles.scroll}
-        contentContainerStyle={step2Styles.content}
+        style={step3Styles.scroll}
+        contentContainerStyle={step3Styles.content}
         showsVerticalScrollIndicator={false}
       >
-        {/* Heading */}
-        <View style={step2Styles.headingBlock}>
-          <Text style={step2Styles.heading}>{'좋아하는 장르를\n선택해주세요'}</Text>
-          <Text style={step2Styles.subheading}>
+        <View style={step3Styles.headingBlock}>
+          <Text style={step3Styles.heading}>{'좋아하는 장르를\n선택해주세요'}</Text>
+          <Text style={step3Styles.subheading}>
             복수 선택 가능 · 취향에 맞는 메이트를 추천해드려요
           </Text>
         </View>
 
-        {/* Selection counter pill */}
-        <View style={step2Styles.counterPill}>
-          <Text style={step2Styles.counterText}>
+        <View style={step3Styles.counterPill}>
+          <Text style={step3Styles.counterText}>
             <Text>{selected.size}개</Text>
             <Text style={{ opacity: 0.6 }}> 선택됨</Text>
           </Text>
         </View>
 
-        {/* Genre grid */}
-        <View style={step2Styles.grid}>
+        <View style={step3Styles.grid}>
           {GENRES.map((g) => (
-            <View key={g.id} style={step2Styles.gridItem}>
+            <View key={g.id} style={step3Styles.gridItem}>
               <GenreTag
                 label={g.label}
                 selected={selected.has(g.id)}
@@ -504,7 +808,7 @@ const Step2 = ({ onDone }: { onDone: (genres: string[]) => void }) => {
   );
 };
 
-const step2Styles = StyleSheet.create({
+const step3Styles = StyleSheet.create({
   scroll: { flex: 1 },
   content: {
     paddingHorizontal: spacing.s6,
@@ -554,18 +858,20 @@ const step2Styles = StyleSheet.create({
 export default function SignUpScreen() {
   const [step, setStep] = useState(1);
   const [profileData, setProfileData] = useState({ nickname: '', bio: '' });
+  const [location, setLocation] = useState<string | null>(null);
 
   const handleBack = () => {
-    if (step === 1) {
-      router.back();
-    } else {
-      setStep(1);
-    }
+    if (step === 1) router.back();
+    else setStep((s) => s - 1);
   };
 
   const handleStep1Done = (nickname: string, bio: string) => {
     setProfileData({ nickname, bio });
     setStep(2);
+  };
+
+  const handleStep2Done = () => {
+    setStep(3);
   };
 
   const handleDone = async (genres: string[]) => {
@@ -581,18 +887,18 @@ export default function SignUpScreen() {
     }
   };
 
-  const title = step === 1 ? '프로필 설정' : '취향 선택';
+  const title = step === 1 ? '프로필 설정' : step === 2 ? '활동 동네' : '취향 선택';
 
   return (
     <SafeAreaView style={styles.root}>
       <StatusBar barStyle="dark-content" backgroundColor={colors.bg} />
-      <TopBar title={title} step={step} onBack={handleBack} />
+      <TopBar title={title} step={step} totalSteps={3} onBack={handleBack} />
       <View style={styles.body}>
-        {step === 1 ? (
-          <Step1 onNext={handleStep1Done} />
-        ) : (
-          <Step2 onDone={handleDone} />
+        {step === 1 && <Step1 onNext={handleStep1Done} />}
+        {step === 2 && (
+          <Step2 selected={location} onSelect={setLocation} onNext={handleStep2Done} />
         )}
+        {step === 3 && <Step3 onDone={handleDone} />}
       </View>
     </SafeAreaView>
   );

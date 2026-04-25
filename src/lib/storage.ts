@@ -1,7 +1,7 @@
 import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 
-const ACCESS_KEY = 'pm_access_token';
+const ACCESS_KEY  = 'pm_access_token';
 const REFRESH_KEY = 'pm_refresh_token';
 
 // expo-secure-store is not available on web — fall back to localStorage
