@@ -32,13 +32,13 @@ public class LocationService {
     @SuppressWarnings("unchecked")
     public List<LocationResult> search(String query) {
         String url = localSearchUrl + "?query=" + encodeQuery(query) + "&size=10";
-        log.debug("[Location] 검색 URL: {}", url);
+        log.info("[Location] 검색 URL: {}", url);
         ResponseEntity<Map> response = exchange(url);
 
         if (response.getBody() == null) return Collections.emptyList();
 
         List<Map<String, Object>> documents = (List<Map<String, Object>>) response.getBody().get("documents");
-        log.debug("[Location] 카카오 응답 documents 수: {}", documents == null ? "null" : documents.size());
+        log.info("[Location] 카카오 응답 documents 수: {}", documents == null ? "null" : documents.size());
         if (documents == null) return Collections.emptyList();
 
         return documents.stream()
@@ -52,7 +52,7 @@ public class LocationService {
                     String name     = str(src, "region_3depth_name");
                     if (name.isBlank()) name = str(src, "region_3depth_h_name");
                     String full     = str(src, "address_name");
-                    log.debug("[Location] doc → name={}, district={}, city={}", name, district, city);
+                    log.info("[Location] doc → name={}, district={}, city={}", name, district, city);
                     if (name.isBlank()) return null;
                     return new LocationResult(name, district, city, full);
                 })
@@ -87,7 +87,7 @@ public class LocationService {
         HttpHeaders headers = new HttpHeaders();
         headers.set("Authorization", "KakaoAK " + apiKey);
         HttpEntity<Void> entity = new HttpEntity<>(headers);
-        return restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
+        return restTemplate.exchange(java.net.URI.create(url), HttpMethod.GET, entity, Map.class);
     }
 
     private String str(Map<String, Object> map, String key) {
