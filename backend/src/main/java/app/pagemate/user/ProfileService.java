@@ -8,6 +8,7 @@ import app.pagemate.book.BookQueryRepository;
 import app.pagemate.common.exception.ErrorCode;
 import app.pagemate.common.exception.PagemateException;
 import app.pagemate.common.service.S3Service;
+import app.pagemate.user.dto.OnboardRequest;
 import app.pagemate.user.dto.ProfileResponse;
 import app.pagemate.user.dto.ProfileUpdateRequest;
 import lombok.RequiredArgsConstructor;
@@ -37,6 +38,13 @@ public class ProfileService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new PagemateException(ErrorCode.USER_NOT_FOUND));
 
+        if (req.getHandle() != null && !req.getHandle().equals(user.getHandle())) {
+            if (userRepository.existsByHandle(req.getHandle())) {
+                throw new PagemateException(ErrorCode.DUPLICATE_HANDLE);
+            }
+            user.updateHandle(req.getHandle());
+        }
+
         String imageUrl = null;
         if (req.getImage() != null && !req.getImage().isEmpty()) {
             if (user.getProfileImage() != null) {
@@ -52,6 +60,31 @@ public class ProfileService {
                 req.getAvatarColor(),
                 req.getTags(),
                 imageUrl
+        );
+
+        int bookCount = bookRepository.countByOwnerId(userId);
+        return ProfileResponse.of(user, bookCount);
+    }
+
+    @Transactional
+    public ProfileResponse onboard(Long userId, OnboardRequest req) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new PagemateException(ErrorCode.USER_NOT_FOUND));
+
+        if (req.handle() != null && !req.handle().equals(user.getHandle())) {
+            if (userRepository.existsByHandle(req.handle())) {
+                throw new PagemateException(ErrorCode.DUPLICATE_HANDLE);
+            }
+            user.updateHandle(req.handle());
+        }
+
+        user.updateProfile(
+                req.nickname(),
+                req.bio(),
+                req.location(),
+                null,
+                req.genres(),
+                null
         );
 
         int bookCount = bookRepository.countByOwnerId(userId);

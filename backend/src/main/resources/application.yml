@@ -54,6 +54,8 @@ aws:
 kakao:
   api-key: ${KAKAO_REST_API_KEY}
   book-search-url: https://dapi.kakao.com/v3/search/book
+  local-search-url: https://dapi.kakao.com/v2/local/search/address.json
+  reverse-geocode-url: https://dapi.kakao.com/v2/local/geo/coord2address.json
 
 oauth:
   kakao:

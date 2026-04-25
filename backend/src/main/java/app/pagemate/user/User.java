@@ -84,4 +84,8 @@ public class User {
         if (tags != null) { this.tags.clear(); this.tags.addAll(tags); }
         if (profileImage != null) this.profileImage = profileImage;
     }
+
+    public void updateHandle(String handle) {
+        this.handle = handle;
+    }
 }

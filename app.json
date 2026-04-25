@@ -9,10 +9,14 @@
     "platforms": ["ios", "android", "web"],
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "app.pagemate"
+      "bundleIdentifier": "app.pagemate",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "현재 위치로 활동 동네를 설정하기 위해 위치 권한이 필요합니다."
+      }
     },
     "android": {
-      "package": "app.pagemate"
+      "package": "app.pagemate",
+      "permissions": ["ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION"]
     },
     "web": {
       "bundler": "metro",
@@ -20,7 +24,13 @@
     },
     "plugins": [
       "expo-router",
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "현재 위치로 활동 동네를 설정하기 위해 위치 권한이 필요합니다."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

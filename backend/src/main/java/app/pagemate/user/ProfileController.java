@@ -3,6 +3,7 @@ package app.pagemate.user;
 import app.pagemate.book.dto.BookPageResponse;
 import app.pagemate.book.dto.BookSummaryResponse;
 import app.pagemate.common.response.ApiResponse;
+import app.pagemate.user.dto.OnboardRequest;
 import app.pagemate.user.dto.ProfileResponse;
 import app.pagemate.user.dto.ProfileUpdateRequest;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -26,10 +27,19 @@ public class ProfileController {
         return ApiResponse.ok(profileService.getMyProfile(userId));
     }
 
+    @PostMapping("/me/onboard")
+    public ApiResponse<ProfileResponse> onboard(
+            @AuthenticationPrincipal Long userId,
+            @RequestBody OnboardRequest req
+    ) {
+        return ApiResponse.ok(profileService.onboard(userId, req));
+    }
+
     @PatchMapping(value = "/me", consumes = "multipart/form-data")
     public ApiResponse<ProfileResponse> updateMyProfile(
             @AuthenticationPrincipal Long userId,
             @RequestParam(required = false) String nickname,
+            @RequestParam(required = false) String handle,
             @RequestParam(required = false) String bio,
             @RequestParam(required = false) String location,
             @RequestParam(required = false) String avatarColor,
@@ -38,6 +48,7 @@ public class ProfileController {
     ) throws Exception {
         ProfileUpdateRequest req = new ProfileUpdateRequest();
         req.setNickname(nickname);
+        req.setHandle(handle);
         req.setBio(bio);
         req.setLocation(location);
         req.setAvatarColor(avatarColor);

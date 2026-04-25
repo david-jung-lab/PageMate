@@ -10,6 +10,7 @@ import java.util.List;
 @Setter
 public class ProfileUpdateRequest {
     private String nickname;
+    private String handle;
     private String bio;
     private String location;
     private String avatarColor;

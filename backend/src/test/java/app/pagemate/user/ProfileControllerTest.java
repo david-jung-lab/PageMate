@@ -142,4 +142,51 @@ class ProfileControllerTest {
                 .andDo(print())
                 .andExpect(status().isNotFound());
     }
+
+    @Test
+    @DisplayName("POST /v1/users/me/onboard - 온보딩 완료")
+    void onboard() throws Exception {
+        java.util.Map<String, Object> body = java.util.Map.of(
+                "nickname", "온보딩테스터",
+                "handle", "onboard_" + System.nanoTime() % 100000,
+                "bio", "책 좋아해요",
+                "location", "망원동 · 마포구",
+                "genres", List.of("novel", "essay")
+        );
+
+        mockMvc.perform(post("/v1/users/me/onboard")
+                        .header("Authorization", "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(body)))
+                .andDo(print())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.nickname").value("온보딩테스터"))
+                .andExpect(jsonPath("$.data.location").value("망원동 · 마포구"))
+                .andExpect(jsonPath("$.data.tags").isArray());
+    }
+
+    @Test
+    @DisplayName("POST /v1/users/me/onboard - 중복 핸들 → 409")
+    void onboard_duplicateHandle() throws Exception {
+        // 다른 유저 생성
+        User other = userRepository.save(User.builder()
+                .oauthProvider(OAuthProvider.KAKAO)
+                .oauthId("other_ob_" + System.nanoTime())
+                .nickname("타인")
+                .handle("taken_handle_" + System.nanoTime() % 10000)
+                .build());
+
+        java.util.Map<String, Object> body = java.util.Map.of(
+                "nickname", "닉네임",
+                "handle", other.getHandle(),
+                "location", "연남동",
+                "genres", List.of("novel")
+        );
+
+        mockMvc.perform(post("/v1/users/me/onboard")
+                        .header("Authorization", "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(body)))
+                .andExpect(status().isConflict());
+    }
 }
