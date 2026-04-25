@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity,
+  View, Text, Image, ScrollView, TouchableOpacity,
   StyleSheet, SafeAreaView, StatusBar, ActivityIndicator,
 } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
@@ -9,7 +9,6 @@ import PMIcon from '../components/ui/PMIcon';
 import PMBadge from '../components/ui/PMBadge';
 import PMAvatar from '../components/ui/PMAvatar';
 import PMBookCover from '../components/ui/PMBookCover';
-import PMTabBar from '../components/ui/PMTabBar';
 import { profileApi } from '../features/profile/api';
 import { Profile } from '../features/profile/types';
 import { BookSummary } from '../features/books/types';
@@ -134,7 +133,10 @@ const MyBookCard: React.FC<MyBookCardProps> = ({ book }) => (
   <TouchableOpacity style={styles.myBookCard} activeOpacity={0.8}
     onPress={() => router.push(`/books/${book.id}`)}>
     <View>
-      <PMBookCover title={book.title} author={book.author} color={book.coverColor} width={116} height={166} />
+      {book.imageUrl
+        ? <Image source={{ uri: book.imageUrl }} style={styles.myBookCover} resizeMode="cover" />
+        : <PMBookCover title={book.title} author={book.author} color={book.coverColor} width={116} height={166} />
+      }
       <View style={styles.myBookBadge}>
         <PMBadge variant={statusVariant(book.status)} size="sm">
           {STATUS_LABEL[book.status] ?? book.status}
@@ -206,7 +208,6 @@ const SettingsItem: React.FC<SettingsItemProps> = ({ icon, title, subtitle, dang
 
 /* ---------- ProfileScreen ---------- */
 const ProfileScreen: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'me' | 'home' | 'search' | 'swap' | 'chat'>('me');
   const [profile, setProfile] = useState<Profile | null>(null);
   const clearAuth = useAuthStore((s) => s.clearAuth);
 
@@ -298,7 +299,6 @@ const ProfileScreen: React.FC = () => {
           </ScrollView>
         )}
 
-        <PMTabBar active={activeTab} onChange={setActiveTab} />
       </View>
     </SafeAreaView>
   );
@@ -345,6 +345,7 @@ const styles = StyleSheet.create({
   sectionActionText: { fontSize: 12, fontWeight: '600', color: colors.primary },
   booksRow: { flexDirection: 'row', gap: 12, paddingHorizontal: spacing.s4, paddingBottom: 28 },
   myBookCard: { width: 116, gap: 8 },
+  myBookCover: { width: 116, height: 166, borderRadius: radius.md },
   myBookBadge: { position: 'absolute', top: 8, left: 8 },
   myBookTitle: { fontSize: 12, fontWeight: '600', color: colors.text, letterSpacing: -0.1, lineHeight: 16 },
   myBookAuthor: { fontSize: 11, color: colors.textSecondary, marginTop: -4 },
