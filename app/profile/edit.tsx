@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, ScrollView,
   StyleSheet, SafeAreaView, Alert, ActivityIndicator,
@@ -27,6 +27,17 @@ export default function ProfileEditScreen() {
   const [avatarColor, setAvatarColor] = useState<AvatarColor>('blue');
   const [tags, setTags] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    profileApi.getMyProfile().then((p) => {
+      setNickname(p.nickname ?? '');
+      setBio(p.bio ?? '');
+      setLocation(p.location ?? '');
+      setAvatarColor((p.avatarColor as AvatarColor) ?? 'blue');
+      setTags(p.tags ?? []);
+    }).catch(() => {}).finally(() => setLoading(false));
+  }, []);
 
   const toggleTag = (tag: string) => {
     setTags(prev =>
@@ -50,6 +61,14 @@ export default function ProfileEditScreen() {
       setSaving(false);
     }
   };
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <ActivityIndicator style={{ flex: 1 }} color={colors.primary} />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safe}>

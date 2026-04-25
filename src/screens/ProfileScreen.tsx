@@ -13,6 +13,8 @@ import PMTabBar from '../components/ui/PMTabBar';
 import { profileApi } from '../features/profile/api';
 import { Profile } from '../features/profile/types';
 import { BookSummary } from '../features/books/types';
+import { readingApi } from '../features/reading/api';
+import { ReadingRecord } from '../features/reading/types';
 
 type AvatarColor = 'blue' | 'orange' | 'sage' | 'plum' | 'sand' | 'ink';
 type BadgeVariant = 'success' | 'primary' | 'default';
@@ -26,12 +28,6 @@ const statusVariant = (s: string): BadgeVariant => {
 const STATUS_LABEL: Record<string, string> = {
   AVAILABLE: '교환가능', IN_PROGRESS: '교환중', COMPLETED: '교환완료',
 };
-
-const READ_HISTORY = [
-  { id: 1, title: '아주 희미한 빛으로도', author: '최은영', rating: 5, date: '4월 18일', color: 'sage' as const },
-  { id: 2, title: '달까지 가자', author: '장류진', rating: 4, date: '4월 5일', color: 'ink' as const },
-  { id: 3, title: '소년이 온다', author: '한강', rating: 5, date: '3월 22일', color: 'plum' as const },
-];
 
 /* ---------- Stars ---------- */
 const Stars: React.FC<{ value: number }> = ({ value }) => (
@@ -48,10 +44,12 @@ const TopBar: React.FC = () => (
   <View style={styles.topBar}>
     <Text style={styles.topBarTitle}>마이</Text>
     <View style={styles.topBarActions}>
-      <TouchableOpacity style={styles.iconBtn} activeOpacity={0.7}>
+      <TouchableOpacity style={styles.iconBtn} activeOpacity={0.7}
+        onPress={() => router.push('/notifications')}>
         <PMIcon name="bell" size={20} color={colors.text} />
       </TouchableOpacity>
-      <TouchableOpacity style={styles.iconBtn} activeOpacity={0.7}>
+      <TouchableOpacity style={styles.iconBtn} activeOpacity={0.7}
+        onPress={() => router.push('/profile/edit')}>
         <PMIcon name="settings" size={20} color={colors.text} />
       </TouchableOpacity>
     </View>
@@ -160,21 +158,27 @@ const AddBookTile: React.FC = () => (
 );
 
 /* ---------- ReadItem ---------- */
-interface ReadItemProps { book: typeof READ_HISTORY[number]; isLast: boolean }
+interface ReadItemProps { record: ReadingRecord; isLast: boolean }
 
-const ReadItem: React.FC<ReadItemProps> = ({ book, isLast }) => (
-  <View style={[styles.readItem, !isLast && styles.readItemBorder]}>
-    <PMBookCover title={book.title} author={book.author} color={book.color} width={40} height={58} />
-    <View style={styles.readItemMeta}>
-      <Text style={styles.readItemTitle} numberOfLines={1}>{book.title}</Text>
-      <Text style={styles.readItemAuthor}>{book.author}</Text>
-      <View style={styles.readItemBottom}>
-        <Stars value={book.rating} />
-        <Text style={styles.readItemDate}>{book.date}</Text>
+const ReadItem: React.FC<ReadItemProps> = ({ record, isLast }) => {
+  const date = record.readAt
+    ? new Date(record.readAt).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })
+    : '';
+  return (
+    <View style={[styles.readItem, !isLast && styles.readItemBorder]}>
+      <PMBookCover title={record.bookTitle} author={record.author}
+        color={(record.coverColor ?? 'sage') as any} width={40} height={58} />
+      <View style={styles.readItemMeta}>
+        <Text style={styles.readItemTitle} numberOfLines={1}>{record.bookTitle}</Text>
+        <Text style={styles.readItemAuthor}>{record.author}</Text>
+        <View style={styles.readItemBottom}>
+          <Stars value={record.rating} />
+          <Text style={styles.readItemDate}>{date}</Text>
+        </View>
       </View>
     </View>
-  </View>
-);
+  );
+};
 
 /* ---------- SettingsItem ---------- */
 interface SettingsItemProps {
@@ -203,18 +207,21 @@ const ProfileScreen: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'me' | 'home' | 'search' | 'swap' | 'chat'>('me');
   const [profile, setProfile] = useState<Profile | null>(null);
   const [books, setBooks] = useState<BookSummary[]>([]);
+  const [readingRecords, setReadingRecords] = useState<ReadingRecord[]>([]);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     try {
-      const [p, b] = await Promise.all([
+      const [p, b, r] = await Promise.all([
         profileApi.getMyProfile(),
         profileApi.getMyBooks(0, 10).catch(() => ({ content: [] as BookSummary[] })),
+        readingApi.getMyRecords(0, 3).catch(() => ({ content: [] as ReadingRecord[] })),
       ]);
       setProfile(p);
       setBooks(b.content);
+      setReadingRecords(r.content);
     } catch {
-      // 비로그인 상태면 mock 유지
+      // 비로그인 상태면 무시
     } finally {
       setLoading(false);
     }
@@ -243,18 +250,19 @@ const ProfileScreen: React.FC = () => {
               <AddBookTile />
             </ScrollView>
 
-            <SectionHeader title="독서 기록" />
-            <View style={styles.card}>
-              {READ_HISTORY.map((b, i) => (
-                <ReadItem key={b.id} book={b} isLast={i === READ_HISTORY.length - 1} />
-              ))}
-              <View style={styles.readMoreDivider}>
-                <TouchableOpacity style={styles.readMoreBtn} activeOpacity={0.7}>
-                  <Text style={styles.readMoreText}>독서 기록 더보기</Text>
-                  <PMIcon name="chevronRight" size={14} color={colors.primary} />
-                </TouchableOpacity>
+            <SectionHeader title="독서 기록" action="기록 추가"
+              onAction={() => router.push('/reading/new')} />
+            {readingRecords.length > 0 ? (
+              <View style={styles.card}>
+                {readingRecords.map((r, i) => (
+                  <ReadItem key={r.id} record={r} isLast={i === readingRecords.length - 1} />
+                ))}
               </View>
-            </View>
+            ) : (
+              <View style={[styles.card, { alignItems: 'center', padding: 24 }]}>
+                <Text style={{ fontSize: 13, color: colors.textTertiary }}>아직 독서 기록이 없어요</Text>
+              </View>
+            )}
 
             <SectionHeader title="설정" />
             <View style={[styles.card, styles.settingsCard]}>

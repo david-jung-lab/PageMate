@@ -11,6 +11,10 @@ export default function RootLayout() {
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="books" />
         <Stack.Screen name="chat" />
+        <Stack.Screen name="notifications" />
+        <Stack.Screen name="reading" />
+        <Stack.Screen name="profile" />
+        <Stack.Screen name="users" />
       </Stack>
     </QueryClientProvider>
   );

@@ -5,21 +5,13 @@ export const readingApi = {
   /** 내 독서 기록 목록 */
   getMyRecords: (page = 0, size = 20) =>
     api
-      .get<{ data: ReadingRecordPage }>('/reading-records', { params: { page, size } })
-      .then((r) => r.data.data),
-
-  /** 특정 유저의 공개 독서 기록 */
-  getUserRecords: (userId: number, page = 0, size = 20) =>
-    api
-      .get<{ data: ReadingRecordPage }>(`/users/${userId}/reading-records`, {
-        params: { page, size },
-      })
+      .get<{ data: ReadingRecordPage }>('/v1/reading-records', { params: { page, size } })
       .then((r) => r.data.data),
 
   /** 독서 기록 등록 */
   create: (req: ReadingRecordRequest) =>
     api
-      .post<{ data: ReadingRecord }>('/reading-records', req)
+      .post<{ data: ReadingRecord }>('/v1/reading-records', req)
       .then((r) => r.data.data),
 
   /** 독서 기록 수정 */
