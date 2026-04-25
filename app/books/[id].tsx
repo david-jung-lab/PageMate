@@ -16,6 +16,7 @@ import { profileApi } from '../../src/features/profile/api';
 import { exchangeApi } from '../../src/features/exchange/api';
 import { CONDITION_LABELS, STATUS_LABELS } from '../../src/constants';
 import { BookSummary } from '../../src/features/books/types';
+import { useAuthStore } from '../../src/store';
 
 const statusVariant = (s: string) => {
   if (s === 'AVAILABLE') return 'success' as const;
@@ -27,6 +28,7 @@ export default function BookDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const queryClient = useQueryClient();
+  const myUserId = useAuthStore((s) => s.user?.id);
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedBookId, setSelectedBookId] = useState<number | null>(null);
 
@@ -180,23 +182,25 @@ export default function BookDetailScreen() {
           </View>
         </View>
 
-        {/* 교환 요청 버튼 */}
-        <View style={styles.actionSection}>
-          <TouchableOpacity
-            style={[
-              styles.exchangeBtn,
-              book.status !== 'AVAILABLE' && styles.exchangeBtnDisabled,
-            ]}
-            activeOpacity={0.85}
-            disabled={book.status !== 'AVAILABLE'}
-            onPress={() => setModalVisible(true)}
-          >
-            <PMIcon name="swap" size={18} color="#fff" />
-            <Text style={styles.exchangeBtnText}>
-              {book.status === 'AVAILABLE' ? '교환 요청하기' : '교환 불가'}
-            </Text>
-          </TouchableOpacity>
-        </View>
+        {/* 교환 요청 버튼 — 본인 책이면 숨김 */}
+        {book.owner.id !== myUserId && (
+          <View style={styles.actionSection}>
+            <TouchableOpacity
+              style={[
+                styles.exchangeBtn,
+                book.status !== 'AVAILABLE' && styles.exchangeBtnDisabled,
+              ]}
+              activeOpacity={0.85}
+              disabled={book.status !== 'AVAILABLE'}
+              onPress={() => setModalVisible(true)}
+            >
+              <PMIcon name="swap" size={18} color="#fff" />
+              <Text style={styles.exchangeBtnText}>
+                {book.status === 'AVAILABLE' ? '교환 요청하기' : '교환 불가'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </ScrollView>
 
       {/* 교환 요청 모달 */}

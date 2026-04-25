@@ -6,6 +6,7 @@ import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -53,6 +54,12 @@ public class User {
     @Column(length = 100)
     private String location;
 
+    @Column(precision = 10, scale = 7)
+    private BigDecimal lat;
+
+    @Column(precision = 10, scale = 7)
+    private BigDecimal lng;
+
     @Column(name = "refresh_token")
     private String refreshToken;
 
@@ -94,5 +101,10 @@ public class User {
 
     public void updateEmail(String email) {
         this.email = email;
+    }
+
+    public void updateLocation(BigDecimal lat, BigDecimal lng) {
+        this.lat = lat;
+        this.lng = lng;
     }
 }

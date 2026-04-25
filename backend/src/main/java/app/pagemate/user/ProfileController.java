@@ -12,6 +12,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @RestController
@@ -59,6 +60,16 @@ public class ProfileController {
             req.setTags(tagList);
         }
         return ApiResponse.ok(profileService.updateMyProfile(userId, req));
+    }
+
+    @PatchMapping("/me/location")
+    public ApiResponse<Void> updateLocation(
+            @AuthenticationPrincipal Long userId,
+            @RequestParam BigDecimal lat,
+            @RequestParam BigDecimal lng
+    ) {
+        profileService.updateLocation(userId, lat, lng);
+        return ApiResponse.ok(null);
     }
 
     @GetMapping("/me/books")

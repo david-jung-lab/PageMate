@@ -16,6 +16,8 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -89,6 +91,13 @@ public class ProfileService {
 
         int bookCount = bookRepository.countByOwnerId(userId);
         return ProfileResponse.of(user, bookCount);
+    }
+
+    @Transactional
+    public void updateLocation(Long userId, BigDecimal lat, BigDecimal lng) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new PagemateException(ErrorCode.USER_NOT_FOUND));
+        user.updateLocation(lat, lng);
     }
 
     public ProfileResponse getUserProfile(Long targetId) {

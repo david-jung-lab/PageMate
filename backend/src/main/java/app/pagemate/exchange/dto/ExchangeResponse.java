@@ -13,6 +13,7 @@ public record ExchangeResponse(
         UserInfo requester,
         UserInfo respondent,
         String status,
+        Long chatRoomId,
         LocalDateTime createdAt
 ) {
     public record BookInfo(
@@ -52,6 +53,20 @@ public record ExchangeResponse(
                 UserInfo.of(e.getRequester()),
                 UserInfo.of(e.getRespondent()),
                 e.getStatus().name(),
+                null,
+                e.getCreatedAt()
+        );
+    }
+
+    public static ExchangeResponse of(Exchange e, Long chatRoomId) {
+        return new ExchangeResponse(
+                e.getId(),
+                BookInfo.of(e.getRequestedBook()),
+                BookInfo.of(e.getOfferedBook()),
+                UserInfo.of(e.getRequester()),
+                UserInfo.of(e.getRespondent()),
+                e.getStatus().name(),
+                chatRoomId,
                 e.getCreatedAt()
         );
     }

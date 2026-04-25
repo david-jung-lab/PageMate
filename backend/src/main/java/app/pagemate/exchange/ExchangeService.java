@@ -3,6 +3,11 @@ package app.pagemate.exchange;
 import app.pagemate.book.Book;
 import app.pagemate.book.BookRepository;
 import app.pagemate.book.BookStatus;
+import app.pagemate.chat.ChatRoom;
+import app.pagemate.chat.ChatRoomRepository;
+import app.pagemate.chat.Message;
+import app.pagemate.chat.MessageRepository;
+import app.pagemate.chat.MessageType;
 import app.pagemate.common.exception.ErrorCode;
 import app.pagemate.common.exception.PagemateException;
 import app.pagemate.exchange.dto.ExchangeCreateRequest;
@@ -25,6 +30,8 @@ public class ExchangeService {
     private final ExchangeRepository exchangeRepository;
     private final BookRepository bookRepository;
     private final UserRepository userRepository;
+    private final ChatRoomRepository chatRoomRepository;
+    private final MessageRepository messageRepository;
 
     @Transactional
     public ExchangeResponse createExchange(Long requesterId, ExchangeCreateRequest req) {
@@ -96,7 +103,27 @@ public class ExchangeService {
         exchange.getRequestedBook().updateStatus(BookStatus.IN_PROGRESS);
         exchange.getOfferedBook().updateStatus(BookStatus.IN_PROGRESS);
 
-        return ExchangeResponse.of(exchange);
+        // 교환 수락 시 채팅방 자동 생성
+        ChatRoom room = chatRoomRepository.findByExchangeId(exchange.getId())
+                .orElseGet(() -> {
+                    ChatRoom newRoom = chatRoomRepository.save(ChatRoom.builder()
+                            .book(exchange.getRequestedBook())
+                            .requester(exchange.getRequester())
+                            .owner(exchange.getRespondent())
+                            .exchange(exchange)
+                            .build());
+                    Message sysMsg = messageRepository.save(Message.builder()
+                            .chatRoom(newRoom)
+                            .sender(null)
+                            .content("교환이 수락되었어요. 만남 장소를 정해보세요!")
+                            .messageType(MessageType.SYSTEM)
+                            .isRead(true)
+                            .build());
+                    newRoom.updateLastMessage(sysMsg.getContent());
+                    return newRoom;
+                });
+
+        return ExchangeResponse.of(exchange, room.getId());
     }
 
     @Transactional

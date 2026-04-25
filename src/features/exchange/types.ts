@@ -24,6 +24,7 @@ export interface Exchange {
   requester: ExchangeUserInfo;
   respondent: ExchangeUserInfo;
   status: ExchangeStatus;
+  chatRoomId: number | null;
   createdAt: string;
 }
 

@@ -4,6 +4,7 @@ import {
   StyleSheet, SafeAreaView, StatusBar, ActivityIndicator, Alert,
 } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useRouter } from 'expo-router';
 import { colors, spacing, radius, fontSize } from '../../src/theme/tokens';
 import PMIcon from '../../src/components/ui/PMIcon';
 import PMAvatar from '../../src/components/ui/PMAvatar';
@@ -11,6 +12,7 @@ import PMBookCover from '../../src/components/ui/PMBookCover';
 import PMBadge from '../../src/components/ui/PMBadge';
 import { exchangeApi } from '../../src/features/exchange/api';
 import { Exchange, ExchangeStatus } from '../../src/features/exchange/types';
+import { useAuthStore } from '../../src/store';
 
 const STATUS_LABELS: Record<ExchangeStatus, string> = {
   PENDING: '요청 중',
@@ -34,6 +36,8 @@ type Tab = 'active' | 'done';
 export default function SwapScreen() {
   const [tab, setTab] = useState<Tab>('active');
   const queryClient = useQueryClient();
+  const router = useRouter();
+  const myUserId = useAuthStore((s) => s.user?.id);
 
   const activeStatuses: ExchangeStatus[] = ['PENDING', 'ACCEPTED'];
   const doneStatuses: ExchangeStatus[] = ['REJECTED', 'COMPLETED', 'CANCELLED'];
@@ -45,7 +49,12 @@ export default function SwapScreen() {
 
   const acceptMutation = useMutation({
     mutationFn: exchangeApi.acceptExchange,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['exchanges'] }),
+    onSuccess: (exchange) => {
+      queryClient.invalidateQueries({ queryKey: ['exchanges'] });
+      if (exchange.chatRoomId) {
+        router.push(`/chat/${exchange.chatRoomId}` as any);
+      }
+    },
     onError: () => Alert.alert('오류', '수락에 실패했어요.'),
   });
 
@@ -144,18 +153,25 @@ export default function SwapScreen() {
 
       {item.status === 'PENDING' && (
         <View style={styles.actions}>
-          {/* 내가 respondent면 수락/거절 */}
           <ActionButtons
             onAccept={() => handleAccept(item.id)}
             onReject={() => handleReject(item.id)}
             onCancel={() => handleCancel(item.id)}
-            isRespondent
+            isRespondent={item.respondent.id === myUserId}
           />
         </View>
       )}
 
       {item.status === 'ACCEPTED' && (
         <View style={styles.actions}>
+          {item.chatRoomId && (
+            <TouchableOpacity
+              style={styles.btnSecondary}
+              onPress={() => router.push(`/chat/${item.chatRoomId}` as any)}
+            >
+              <Text style={styles.btnSecondaryText}>채팅방 이동</Text>
+            </TouchableOpacity>
+          )}
           <TouchableOpacity style={styles.btnPrimary} onPress={() => handleComplete(item.id)}>
             <Text style={styles.btnPrimaryText}>교환 완료</Text>
           </TouchableOpacity>

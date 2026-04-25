@@ -1,6 +1,7 @@
 package app.pagemate.chat;
 
 import app.pagemate.book.Book;
+import app.pagemate.exchange.Exchange;
 import app.pagemate.user.User;
 import jakarta.persistence.*;
 import lombok.*;
@@ -22,6 +23,10 @@ public class ChatRoom {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "book_id", nullable = false)
     private Book book;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "exchange_id")
+    private Exchange exchange;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "requester_id", nullable = false)
