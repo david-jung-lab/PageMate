@@ -19,6 +19,7 @@ public enum ErrorCode {
 
     // Book
     BOOK_NOT_FOUND("도서를 찾을 수 없습니다.", HttpStatus.NOT_FOUND),
+    KAKAO_API_ERROR("카카오 도서 검색 중 오류가 발생했습니다.", HttpStatus.BAD_GATEWAY),
     BOOK_NOT_AVAILABLE("교환 불가 상태의 도서입니다.", HttpStatus.BAD_REQUEST),
     BOOK_ACCESS_DENIED("본인 소유 도서만 수정할 수 있습니다.", HttpStatus.FORBIDDEN),
 

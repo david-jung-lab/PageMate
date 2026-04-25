@@ -1,0 +1,23 @@
+CREATE TABLE IF NOT EXISTS books (
+    id             BIGINT NOT NULL AUTO_INCREMENT,
+    user_id        BIGINT NOT NULL,
+    title          VARCHAR(200) NOT NULL,
+    author         VARCHAR(100) NOT NULL,
+    publisher      VARCHAR(100),
+    isbn           VARCHAR(20),
+    genre          VARCHAR(50) NOT NULL,
+    book_condition VARCHAR(20) NOT NULL,
+    description    VARCHAR(200),
+    image_url      TEXT,
+    cover_color    VARCHAR(20) NOT NULL DEFAULT 'sage',
+    status         VARCHAR(20) NOT NULL DEFAULT 'AVAILABLE',
+    lat            DECIMAL(10, 7),
+    lng            DECIMAL(10, 7),
+    created_at     DATETIME(6) NOT NULL,
+    updated_at     DATETIME(6) NOT NULL,
+    PRIMARY KEY (id),
+    CONSTRAINT fk_books_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+    INDEX idx_books_status (status),
+    INDEX idx_books_genre (genre),
+    INDEX idx_books_lat_lng (lat, lng)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
