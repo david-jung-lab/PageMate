@@ -1,0 +1,8 @@
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+*.class
+*.log
+.env
+application-local.yml
+application-secret.yml
