@@ -26,16 +26,16 @@ public class AuthService {
     @Transactional
     public AuthResponse loginWithKakao(String authorizationCode, String redirectUri) {
         KakaoOAuthClient.UserInfo info = kakaoOAuthClient.getUserInfo(authorizationCode, redirectUri);
-        return processLogin(OAuthProvider.KAKAO, info.oauthId(), info.nickname(), info.profileImage());
+        return processLogin(OAuthProvider.KAKAO, info.oauthId(), info.nickname(), info.email(), info.profileImage());
     }
 
     @Transactional
     public AuthResponse loginWithGoogle(String authorizationCode, String redirectUri) {
         GoogleOAuthClient.UserInfo info = googleOAuthClient.getUserInfo(authorizationCode, redirectUri);
-        return processLogin(OAuthProvider.GOOGLE, info.oauthId(), info.nickname(), info.profileImage());
+        return processLogin(OAuthProvider.GOOGLE, info.oauthId(), info.nickname(), info.email(), info.profileImage());
     }
 
-    private AuthResponse processLogin(OAuthProvider provider, String oauthId, String nickname, String profileImage) {
+    private AuthResponse processLogin(OAuthProvider provider, String oauthId, String nickname, String email, String profileImage) {
         boolean isNewUser = false;
         User user = userRepository.findByOauthProviderAndOauthId(provider, oauthId).orElse(null);
 
@@ -45,9 +45,12 @@ public class AuthService {
                     .oauthProvider(provider)
                     .oauthId(oauthId)
                     .nickname(nickname)
+                    .email(email)
                     .handle(generateUniqueHandle())
                     .profileImage(profileImage)
                     .build());
+        } else if (email != null && !email.equals(user.getEmail())) {
+            user.updateEmail(email);
         }
 
         String accessToken = jwtProvider.createAccessToken(user.getId());

@@ -67,7 +67,7 @@ public class GoogleOAuthClient {
                 .retrieve()
                 .body(GoogleUser.class);
 
-        return new UserInfo(user.getSub(), user.getName(), user.getPicture());
+        return new UserInfo(user.getSub(), user.getName(), user.getEmail(), user.getPicture());
     }
 
     @Getter
@@ -79,8 +79,9 @@ public class GoogleOAuthClient {
     private static class GoogleUser {
         private String sub;
         private String name;
+        private String email;
         private String picture;
     }
 
-    public record UserInfo(String oauthId, String nickname, String profileImage) {}
+    public record UserInfo(String oauthId, String nickname, String email, String profileImage) {}
 }

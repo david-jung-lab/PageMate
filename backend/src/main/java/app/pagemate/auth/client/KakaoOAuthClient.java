@@ -75,13 +75,18 @@ public class KakaoOAuthClient {
                 .body(KakaoUser.class);
 
         String nickname = null;
+        String email = null;
         String profileImage = null;
-        if (kakaoUser.getKakao_account() != null && kakaoUser.getKakao_account().getProfile() != null) {
-            nickname = kakaoUser.getKakao_account().getProfile().getNickname();
-            profileImage = kakaoUser.getKakao_account().getProfile().getProfile_image_url();
+        if (kakaoUser.getKakao_account() != null) {
+            KakaoUser.KakaoAccount account = kakaoUser.getKakao_account();
+            email = account.getEmail();
+            if (account.getProfile() != null) {
+                nickname = account.getProfile().getNickname();
+                profileImage = account.getProfile().getProfile_image_url();
+            }
         }
 
-        return new UserInfo(String.valueOf(kakaoUser.getId()), nickname, profileImage);
+        return new UserInfo(String.valueOf(kakaoUser.getId()), nickname, email, profileImage);
     }
 
     @Getter
@@ -96,6 +101,7 @@ public class KakaoOAuthClient {
 
         @Getter
         private static class KakaoAccount {
+            private String email;
             private Profile profile;
 
             @Getter
@@ -106,5 +112,5 @@ public class KakaoOAuthClient {
         }
     }
 
-    public record UserInfo(String oauthId, String nickname, String profileImage) {}
+    public record UserInfo(String oauthId, String nickname, String email, String profileImage) {}
 }

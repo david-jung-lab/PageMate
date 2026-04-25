@@ -32,6 +32,9 @@ public class User {
     @Column(name = "oauth_id", nullable = false, length = 100)
     private String oauthId;
 
+    @Column(length = 100)
+    private String email;
+
     @Column(length = 30)
     private String nickname;
 
@@ -87,5 +90,9 @@ public class User {
 
     public void updateHandle(String handle) {
         this.handle = handle;
+    }
+
+    public void updateEmail(String email) {
+        this.email = email;
     }
 }
