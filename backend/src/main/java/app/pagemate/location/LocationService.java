@@ -2,6 +2,7 @@ package app.pagemate.location;
 
 import app.pagemate.location.dto.LocationResult;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
@@ -12,6 +13,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class LocationService {
@@ -30,21 +32,27 @@ public class LocationService {
     @SuppressWarnings("unchecked")
     public List<LocationResult> search(String query) {
         String url = localSearchUrl + "?query=" + encodeQuery(query) + "&size=10";
+        log.debug("[Location] 검색 URL: {}", url);
         ResponseEntity<Map> response = exchange(url);
 
         if (response.getBody() == null) return Collections.emptyList();
 
         List<Map<String, Object>> documents = (List<Map<String, Object>>) response.getBody().get("documents");
+        log.debug("[Location] 카카오 응답 documents 수: {}", documents == null ? "null" : documents.size());
         if (documents == null) return Collections.emptyList();
 
         return documents.stream()
                 .map(doc -> {
                     Map<String, Object> addr = (Map<String, Object>) doc.get("address");
-                    if (addr == null) return null;
-                    String city = str(addr, "region_1depth_name");
-                    String district = str(addr, "region_2depth_name");
-                    String name = str(addr, "region_3depth_name");
-                    String full = str(addr, "address_name");
+                    Map<String, Object> road = (Map<String, Object>) doc.get("road_address");
+                    Map<String, Object> src  = addr != null ? addr : road;
+                    if (src == null) return null;
+                    String city     = str(src, "region_1depth_name");
+                    String district = str(src, "region_2depth_name");
+                    String name     = str(src, "region_3depth_name");
+                    if (name.isBlank()) name = str(src, "region_3depth_h_name");
+                    String full     = str(src, "address_name");
+                    log.debug("[Location] doc → name={}, district={}, city={}", name, district, city);
                     if (name.isBlank()) return null;
                     return new LocationResult(name, district, city, full);
                 })

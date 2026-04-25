@@ -95,6 +95,7 @@ export default function LoginScreen() {
   const [loading, setLoading] = React.useState<'google' | 'kakao' | null>(null);
 
   useEffect(() => {
+    console.log('[Google OAuth] redirectUri:', googleRedirectUri);
     console.log('[Kakao OAuth] redirectUri:', kakaoRedirectUri);
   }, []);
 
