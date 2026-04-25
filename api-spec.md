@@ -1,4 +1,4 @@
-# PageMate API 명세서 v1.0
+# PageMate API 명세서 v1.1
 
 | 항목 | 내용 |
 |------|------|
@@ -7,12 +7,20 @@
 | 응답 형식 | JSON |
 | 문서화 | Swagger UI `/swagger-ui.html` |
 
+> **v1.0 → v1.1 변경 요약**
+> - User 모델에 `handle`, `bio`, `location`, `joinedAt`, `tags` 추가 (ProfileScreen 반영)
+> - Book 모델에 `coverColor`, `distance` 추가 (홈 근거리 탐색 반영)
+> - `GET /books` 위치 기반 파라미터(`lat`, `lng`) 추가
+> - `POST /exchanges` 에 `offeredBookId` 추가 (교환 제안 도서)
+> - Reading Record 에 `imageUrl` 추가
+> - Exchange status 값 정리 (`AVAILABLE` / `IN_PROGRESS` / `COMPLETED`)
+
 ---
 
 ## 외부 도서 검색 API — 카카오 도서 검색
 
-> 도서 등록 시 제목/저자 키워드로 책을 검색하여 정보를 자동 완성하는 데 사용합니다.
-> **FE에 API 키 노출 방지를 위해 BE가 프록시합니다.**
+> 도서 등록 시 제목/저자 키워드로 책을 검색하여 정보를 자동 완성합니다.
+> **FE API 키 노출 방지를 위해 BE가 프록시합니다.**
 
 ### 카카오 도서 검색 API 스펙
 
@@ -74,20 +82,20 @@ GET /books/search/kakao?query={keyword}
         ↓
 사용자 직접 입력: 도서 상태, 한줄 소개, (선택) 직접 촬영한 사진
         ↓
-POST /books  ← thumbnail URL을 image_url로 저장 (파일 복사 X)
+POST /books  ← thumbnail URL을 imageUrl로 저장 (파일 복사 X)
 ```
 
 ### 표지 이미지 저장 정책
 
 - 카카오 `thumbnail` URL을 DB에 **URL 그대로 저장** (이미지 파일 S3 복사 금지 — 약관)
 - 사용자가 직접 촬영한 사진은 S3에 업로드하여 저장 (우선순위 높음)
-- FE에서 이미지 로드 실패 시 기본 표지 placeholder로 fallback 처리
+- FE에서 이미지 로드 실패 시 `coverColor` 기반 gradient placeholder로 fallback
 
 ```
-image_url 우선순위:
+imageUrl 우선순위:
 1. 사용자 직접 업로드 이미지 (S3 URL)
 2. 카카오 thumbnail URL
-3. 기본 placeholder 이미지
+3. coverColor gradient placeholder (FE 렌더링)
 ```
 
 ---
@@ -147,6 +155,7 @@ image_url 우선순위:
     "user": {
       "id": 1,
       "nickname": "책방나그네",
+      "handle": "@bookworm_j",
       "profileImage": "https://cdn.pagemate.app/profiles/1.jpg",
       "isNewUser": true
     }
@@ -207,7 +216,38 @@ image_url 우선순위:
 
 ## 2. 도서 (Books)
 
-### GET `/books` — 도서 목록 조회 (검색/필터)
+### 도서 상태(status) 값 정의
+
+| 값 | 한국어 | 설명 |
+|----|--------|------|
+| `AVAILABLE` | 교환가능 | 교환 요청 받을 수 있는 상태 |
+| `IN_PROGRESS` | 교환중 | 교환 요청 수락 후 진행 중 |
+| `COMPLETED` | 교환완료 | 교환이 완료된 도서 |
+
+### 도서 컨디션(condition) 값 정의
+
+| 값 | 한국어 | 설명 |
+|----|--------|------|
+| `LIKE_NEW` | 상 | 거의 새 책 수준 |
+| `GOOD` | 중 | 읽은 흔적 있으나 깨끗함 |
+| `ACCEPTABLE` | 하 | 메모·밑줄 등 사용감 있음 |
+
+### 도서 커버 색상(coverColor) 값 정의
+
+FE `PMBookCover` 컴포넌트에서 imageUrl이 없을 때 gradient placeholder로 사용합니다.
+
+| 값 | 설명 |
+|----|------|
+| `blue` | Book Blue 계열 |
+| `orange` | Warm Orange 계열 |
+| `sage` | 세이지 그린 계열 |
+| `plum` | 플럼 퍼플 계열 |
+| `sand` | 샌드 베이지 계열 |
+| `ink` | 딥 인크 계열 |
+
+---
+
+### GET `/books` — 도서 목록 조회 (검색/필터/위치 기반)
 
 **Headers** — 선택적 (비로그인 조회 가능)
 
@@ -215,11 +255,14 @@ image_url 우선순위:
 | 파라미터 | 타입 | 필수 | 설명 |
 |---------|------|------|------|
 | `keyword` | string | N | 제목, 저자, ISBN 검색어 |
-| `genre` | string | N | 장르 필터 (`소설`, `에세이`, `자기계발`, ...) |
-| `condition` | string | N | 도서 상태 (`LIKE_NEW`, `GOOD`, `ACCEPTABLE`) |
+| `genre` | string | N | 장르 필터 (`소설`, `에세이`, `자기계발`, `SF`, `인문`, `시`) |
+| `condition` | string | N | 컨디션 (`LIKE_NEW` / `GOOD` / `ACCEPTABLE`) |
+| `lat` | double | N | 현재 위치 위도 (위치 기반 정렬 시 필요) |
+| `lng` | double | N | 현재 위치 경도 (위치 기반 정렬 시 필요) |
+| `radiusKm` | double | N | 검색 반경 km (기본값: 2.0) |
 | `page` | int | N | 페이지 번호 (기본값: 0) |
 | `size` | int | N | 페이지 크기 (기본값: 20, 최대: 50) |
-| `sort` | string | N | 정렬 기준 (`LATEST`, `POPULAR`) |
+| `sort` | string | N | 정렬 기준 (`LATEST` / `DISTANCE`) |
 
 **Response**
 ```json
@@ -234,12 +277,14 @@ image_url 우선순위:
         "genre": "소설",
         "condition": "GOOD",
         "imageUrl": "https://cdn.pagemate.app/books/1.jpg",
+        "coverColor": "plum",
         "owner": {
           "id": 2,
           "nickname": "책방나그네",
           "profileImage": "https://cdn.pagemate.app/profiles/2.jpg"
         },
         "status": "AVAILABLE",
+        "distance": 0.4,
         "createdAt": "2026-04-25T10:00:00Z"
       }
     ],
@@ -250,6 +295,8 @@ image_url 우선순위:
   }
 }
 ```
+
+> `distance`: `lat`/`lng` 파라미터 제공 시에만 포함. 단위 km.
 
 ---
 
@@ -264,9 +311,11 @@ image_url 우선순위:
 | `author` | string | Y | 저자 |
 | `isbn` | string | N | ISBN |
 | `genre` | string | Y | 장르 |
-| `condition` | string | Y | 상태 (`LIKE_NEW` / `GOOD` / `ACCEPTABLE`) |
+| `condition` | string | Y | 컨디션 (`LIKE_NEW` / `GOOD` / `ACCEPTABLE`) |
 | `description` | string | N | 한줄 소개 (최대 200자) |
+| `coverColor` | string | N | 커버 색상 (기본값: `sage`) |
 | `image` | file | N | 도서 이미지 (jpg/png, 최대 5MB) |
+| `kakaoThumbnailUrl` | string | N | 카카오 검색에서 선택한 경우 thumbnail URL |
 
 **Response**
 ```json
@@ -281,6 +330,7 @@ image_url 우선순위:
     "condition": "GOOD",
     "description": "노벨문학상 수상작, 읽은 지 1년 됐습니다.",
     "imageUrl": "https://cdn.pagemate.app/books/15.jpg",
+    "coverColor": "plum",
     "status": "AVAILABLE",
     "createdAt": "2026-04-25T11:00:00Z"
   }
@@ -306,12 +356,19 @@ image_url 우선순위:
     "condition": "GOOD",
     "description": "노벨문학상 수상작, 읽은 지 1년 됐습니다.",
     "imageUrl": "https://cdn.pagemate.app/books/15.jpg",
+    "coverColor": "plum",
     "status": "AVAILABLE",
+    "distance": 0.4,
     "owner": {
       "id": 2,
       "nickname": "책방나그네",
+      "handle": "@bookworm_j",
       "profileImage": "https://cdn.pagemate.app/profiles/2.jpg",
-      "exchangeCount": 5
+      "bio": "조용한 카페에서 책 읽는 시간을 좋아해요.",
+      "tags": ["소설", "에세이"],
+      "exchangeCount": 5,
+      "bookCount": 12,
+      "rating": 4.9
     },
     "createdAt": "2026-04-25T11:00:00Z"
   }
@@ -328,7 +385,8 @@ image_url 우선순위:
 ```json
 {
   "condition": "ACCEPTABLE",
-  "description": "수정된 소개글입니다."
+  "description": "수정된 소개글입니다.",
+  "coverColor": "sage"
 }
 ```
 
@@ -354,9 +412,13 @@ image_url 우선순위:
 
 **Headers** — `Authorization` 필요
 
-**Query Parameters** — `page`, `size` (공통)
+**Query Parameters**
+| 파라미터 | 타입 | 설명 |
+|---------|------|------|
+| `status` | string | `AVAILABLE` / `IN_PROGRESS` / `COMPLETED` (없으면 전체) |
+| `page`, `size` | int | 페이지네이션 |
 
-**Response** — 도서 목록 페이지네이션 형식과 동일
+**Response** — 도서 목록 페이지네이션 형식과 동일 (`coverColor`, `status` 포함)
 
 ---
 
@@ -370,9 +432,16 @@ image_url 우선순위:
 ```json
 {
   "bookId": 15,
-  "message": "교환 희망합니다! 제가 가진 책 목록 확인해 주세요."
+  "offeredBookId": 8,
+  "message": "교환 희망합니다! 제가 『소년이 온다』를 제안드려요."
 }
 ```
+
+| 필드 | 타입 | 필수 | 설명 |
+|------|------|------|------|
+| `bookId` | long | Y | 원하는 상대방 도서 ID |
+| `offeredBookId` | long | N | 내가 제공할 도서 ID (미입력 시 내 목록에서 나중에 선택 가능) |
+| `message` | string | N | 교환 요청 메시지 |
 
 **Response**
 ```json
@@ -380,9 +449,15 @@ image_url 우선순위:
   "success": true,
   "data": {
     "id": 7,
-    "book": {
+    "requestedBook": {
       "id": 15,
-      "title": "채식주의자"
+      "title": "채식주의자",
+      "coverColor": "plum"
+    },
+    "offeredBook": {
+      "id": 8,
+      "title": "소년이 온다",
+      "coverColor": "ink"
     },
     "requester": {
       "id": 3,
@@ -393,7 +468,7 @@ image_url 우선순위:
       "nickname": "책방나그네"
     },
     "status": "PENDING",
-    "message": "교환 희망합니다! 제가 가진 책 목록 확인해 주세요.",
+    "message": "교환 희망합니다!",
     "createdAt": "2026-04-25T12:00:00Z"
   }
 }
@@ -473,10 +548,16 @@ image_url 우선순위:
     "content": [
       {
         "id": 7,
-        "book": {
+        "requestedBook": {
           "id": 15,
           "title": "채식주의자",
-          "imageUrl": "https://cdn.pagemate.app/books/15.jpg"
+          "imageUrl": "https://cdn.pagemate.app/books/15.jpg",
+          "coverColor": "plum"
+        },
+        "offeredBook": {
+          "id": 8,
+          "title": "소년이 온다",
+          "coverColor": "ink"
         },
         "partner": {
           "id": 2,
@@ -512,15 +593,27 @@ image_url 우선순위:
       "id": 3,
       "partner": {
         "id": 2,
-        "nickname": "책방나그네",
-        "profileImage": "https://cdn.pagemate.app/profiles/2.jpg"
+        "nickname": "민지",
+        "handle": "@minji_reads",
+        "profileImage": "https://cdn.pagemate.app/profiles/2.jpg",
+        "avatarColor": "blue"
       },
-      "book": {
-        "id": 15,
-        "title": "채식주의자"
+      "exchange": {
+        "id": 7,
+        "requestedBook": {
+          "id": 15,
+          "title": "작별하지 않는다",
+          "coverColor": "plum"
+        },
+        "offeredBook": {
+          "id": 8,
+          "title": "소년이 온다",
+          "coverColor": "ink"
+        },
+        "status": "ACCEPTED"
       },
       "lastMessage": {
-        "content": "내일 오후 2시 어때요?",
+        "content": "다, 한 일요일 오후 3시 합정역 어떤 가요?",
         "sentAt": "2026-04-25T14:00:00Z"
       },
       "unreadCount": 2
@@ -548,7 +641,14 @@ image_url 우선순위:
   "data": {
     "messages": [
       {
+        "id": 1,
+        "type": "SYSTEM",
+        "content": "교환 요청이 수락되었어요 🎉",
+        "sentAt": "2026-04-25T10:00:00Z"
+      },
+      {
         "id": 42,
+        "type": "TEXT",
         "senderId": 1,
         "content": "안녕하세요, 교환 가능한가요?",
         "sentAt": "2026-04-25T10:30:00Z"
@@ -559,6 +659,13 @@ image_url 우선순위:
   }
 }
 ```
+
+**메시지 type 값**
+| 값 | 설명 |
+|----|------|
+| `TEXT` | 일반 텍스트 메시지 |
+| `SYSTEM` | 시스템 메시지 (교환 수락, 장소 공유 등) |
+| `IMAGE` | 이미지 메시지 |
 
 ---
 
@@ -582,10 +689,12 @@ image_url 우선순위:
     "content": [
       {
         "id": 1,
-        "bookTitle": "채식주의자",
-        "author": "한강",
+        "bookTitle": "아주 희미한 빛으로도",
+        "author": "최은영",
         "rating": 5,
         "memo": "오랫동안 기억에 남을 책",
+        "imageUrl": "https://search1.kakaocdn.net/thumb/...",
+        "coverColor": "sage",
         "isPublic": true,
         "readAt": "2026-03-15",
         "createdAt": "2026-03-16T09:00:00Z"
@@ -608,10 +717,13 @@ image_url 우선순위:
 **Request Body**
 ```json
 {
-  "bookTitle": "채식주의자",
-  "author": "한강",
+  "bookTitle": "아주 희미한 빛으로도",
+  "author": "최은영",
+  "isbn": "9788936472283",
   "rating": 5,
   "memo": "오랫동안 기억에 남을 책",
+  "coverColor": "sage",
+  "kakaoThumbnailUrl": "https://search1.kakaocdn.net/thumb/...",
   "isPublic": true,
   "readAt": "2026-03-15"
 }
@@ -647,13 +759,18 @@ image_url 우선순위:
   "success": true,
   "data": {
     "id": 1,
-    "nickname": "독서광",
+    "nickname": "민지",
+    "handle": "@minji_reads",
     "profileImage": "https://cdn.pagemate.app/profiles/1.jpg",
+    "avatarColor": "blue",
+    "bio": "조용한 카페에서 책 읽는 시간을 좋아해요. 한강, 김초엽, 최은영을 자주 읽어요.",
+    "location": "망원동",
+    "tags": ["소설", "에세이", "SF"],
     "oauthProvider": "KAKAO",
-    "bookCount": 5,
-    "exchangeCount": 3,
-    "readingRecordCount": 12,
-    "createdAt": "2026-04-01T00:00:00Z"
+    "bookCount": 12,
+    "exchangeCount": 8,
+    "readingRecordCount": 34,
+    "joinedAt": "2024-06-01T00:00:00Z"
   }
 }
 ```
@@ -668,17 +785,47 @@ image_url 우선순위:
 | 필드 | 타입 | 설명 |
 |------|------|------|
 | `nickname` | string | 닉네임 (2~12자) |
+| `handle` | string | 핸들 (@ 포함, 4~20자, 영문/숫자/언더스코어) |
+| `bio` | string | 자기소개 (최대 100자) |
+| `location` | string | 동네 (예: 망원동) |
+| `tags` | string[] | 취향 태그 (최대 5개) |
+| `avatarColor` | string | 아바타 색상 |
 | `profileImage` | file | 프로필 이미지 (jpg/png, 최대 3MB) |
 
 ---
 
 ### GET `/users/{id}` — 타인 프로필 조회
 
-**Response** — 공개 정보 (닉네임, 프로필 이미지, 교환 횟수, 공개 독서 기록) 반환
+**Response**
+```json
+{
+  "success": true,
+  "data": {
+    "id": 2,
+    "nickname": "민지",
+    "handle": "@minji_reads",
+    "profileImage": "https://cdn.pagemate.app/profiles/2.jpg",
+    "avatarColor": "blue",
+    "bio": "조용한 카페에서 책 읽는 시간을 좋아해요.",
+    "location": "망원동",
+    "tags": ["소설", "에세이", "SF"],
+    "bookCount": 12,
+    "exchangeCount": 8,
+    "rating": 4.9,
+    "joinedAt": "2024-06-01T00:00:00Z"
+  }
+}
+```
 
 ---
 
 ### GET `/users/{id}/books` — 특정 유저 등록 도서 목록
+
+**Query Parameters** — `page`, `size`
+
+---
+
+### GET `/users/{id}/reading-records` — 특정 유저 독서 기록 (공개만)
 
 **Query Parameters** — `page`, `size`
 
@@ -699,7 +846,7 @@ image_url 우선순위:
       {
         "id": 10,
         "type": "EXCHANGE_REQUEST",
-        "content": "책방나그네님이 교환을 요청했습니다.",
+        "content": "민지님이 교환을 요청했습니다.",
         "isRead": false,
         "referenceId": 7,
         "createdAt": "2026-04-25T12:00:00Z"
@@ -750,7 +897,7 @@ SEND /app/chat/{roomId}/send
 **발신 메시지 형식**
 ```json
 {
-  "content": "내일 오후 2시 어때요?"
+  "content": "내일 오후 3시 합정역 어때요?"
 }
 ```
 
@@ -759,9 +906,10 @@ SEND /app/chat/{roomId}/send
 {
   "id": 43,
   "roomId": 3,
+  "type": "TEXT",
   "senderId": 1,
   "senderNickname": "독서광",
-  "content": "내일 오후 2시 어때요?",
+  "content": "내일 오후 3시 합정역 어때요?",
   "sentAt": "2026-04-25T14:00:00Z"
 }
 ```
