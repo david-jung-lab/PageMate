@@ -13,14 +13,11 @@ import {
 import Svg, { Path } from 'react-native-svg';
 import { router } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
-import * as Google from 'expo-auth-session/providers/google';
 import { makeRedirectUri, useAuthRequest, ResponseType } from 'expo-auth-session';
 import { authApi } from '@/features/auth/api';
 import { useAuthStore } from '@/store/index';
 import {
   GOOGLE_WEB_CLIENT_ID,
-  GOOGLE_IOS_CLIENT_ID,
-  GOOGLE_ANDROID_CLIENT_ID,
   KAKAO_REST_API_KEY,
 } from '@/constants/index';
 
@@ -102,20 +99,27 @@ export default function LoginScreen() {
   }, []);
 
   // ── Google OAuth ─────────────────────────────────────────────────────────
-  const [googleRequest, googleResponse, googlePromptAsync] = Google.useAuthRequest({
-    clientId: GOOGLE_WEB_CLIENT_ID,
-    iosClientId: GOOGLE_IOS_CLIENT_ID,
-    androidClientId: GOOGLE_ANDROID_CLIENT_ID,
-    responseType: 'code' as any,
-    usePKCE: false,
-  });
+  const googleRedirectUri = makeRedirectUri({ scheme: 'pagemate', path: 'oauth' });
+
+  const [, googleResponse, googlePromptAsync] = useAuthRequest(
+    {
+      clientId: GOOGLE_WEB_CLIENT_ID,
+      redirectUri: googleRedirectUri,
+      responseType: ResponseType.Code,
+      usePKCE: false,
+      scopes: ['openid', 'profile', 'email'],
+    },
+    {
+      authorizationEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
+    },
+  );
 
   useEffect(() => {
-    if (googleResponse?.type === 'success') {
+    if (!googleResponse) return;
+    if (googleResponse.type === 'success') {
       const code = googleResponse.params.code;
-      const redirectUri = googleRequest?.redirectUri ?? '';
-      handleOAuthCallback('google', code, redirectUri);
-    } else if (googleResponse?.type === 'error' || googleResponse?.type === 'dismiss') {
+      handleOAuthCallback('google', code, googleRedirectUri);
+    } else if (googleResponse.type === 'error' || googleResponse.type === 'dismiss') {
       setLoading(null);
     }
   }, [googleResponse]);

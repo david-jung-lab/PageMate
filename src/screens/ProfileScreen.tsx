@@ -15,6 +15,8 @@ import { Profile } from '../features/profile/types';
 import { BookSummary } from '../features/books/types';
 import { readingApi } from '../features/reading/api';
 import { ReadingRecord } from '../features/reading/types';
+import { authApi } from '../features/auth/api';
+import { useAuthStore } from '../store';
 
 type AvatarColor = 'blue' | 'orange' | 'sage' | 'plum' | 'sand' | 'ink';
 type BadgeVariant = 'success' | 'primary' | 'default';
@@ -206,6 +208,13 @@ const SettingsItem: React.FC<SettingsItemProps> = ({ icon, title, subtitle, dang
 const ProfileScreen: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'me' | 'home' | 'search' | 'swap' | 'chat'>('me');
   const [profile, setProfile] = useState<Profile | null>(null);
+  const clearAuth = useAuthStore((s) => s.clearAuth);
+
+  const handleLogout = async () => {
+    try { await authApi.logout(); } catch { /* 무시 */ }
+    await clearAuth();
+    router.replace('/(auth)/login');
+  };
   const [books, setBooks] = useState<BookSummary[]>([]);
   const [readingRecords, setReadingRecords] = useState<ReadingRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -281,6 +290,7 @@ const ProfileScreen: React.FC = () => {
                 danger isLast
                 icon={<PMIcon name="logOut" size={18} color={colors.danger} />}
                 title="로그아웃"
+                onPress={handleLogout}
               />
             </View>
 
