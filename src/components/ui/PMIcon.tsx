@@ -127,6 +127,37 @@ const PMIcon: React.FC<PMIconProps> = ({
           <Path d="M21 12H9" stroke={stroke} strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" />
         </Svg>
       );
+    case 'check':
+      return (
+        <Svg {...props}>
+          <Path d="M20 6 9 17l-5-5" stroke={stroke} strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" />
+        </Svg>
+      );
+    case 'close':
+      return (
+        <Svg {...props}>
+          <Path d="M18 6 6 18" stroke={stroke} strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" />
+          <Path d="M6 6l12 12" stroke={stroke} strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" />
+        </Svg>
+      );
+    case 'heart':
+      return (
+        <Svg {...props}>
+          <Path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z" stroke={stroke} strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" />
+        </Svg>
+      );
+    case 'bookmark':
+      return (
+        <Svg {...props}>
+          <Path d="m19 21-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" stroke={stroke} strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" />
+        </Svg>
+      );
+    case 'filter':
+      return (
+        <Svg {...props}>
+          <Path d="M22 3H2l8 9.5V19l4 2v-8.5z" stroke={stroke} strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" />
+        </Svg>
+      );
     default:
       return <Svg {...props} />;
   }

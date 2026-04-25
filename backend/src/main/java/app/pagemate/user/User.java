@@ -74,4 +74,14 @@ public class User {
     public void clearRefreshToken() {
         this.refreshToken = null;
     }
+
+    public void updateProfile(String nickname, String bio, String location,
+                              String avatarColor, List<String> tags, String profileImage) {
+        if (nickname != null) this.nickname = nickname;
+        if (bio != null) this.bio = bio;
+        if (location != null) this.location = location;
+        if (avatarColor != null) this.avatarColor = avatarColor;
+        if (tags != null) { this.tags.clear(); this.tags.addAll(tags); }
+        if (profileImage != null) this.profileImage = profileImage;
+    }
 }
