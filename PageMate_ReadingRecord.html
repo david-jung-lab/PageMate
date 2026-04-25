@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>PageMate — 독서 기록</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; background: #D1D5DB; }
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      font-family: -apple-system, BlinkMacSystemFont, 'Pretendard', 'Segoe UI', sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    #root {
+      width: 390px;
+      min-height: 100vh;
+      background: #FAFAF8;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 0 60px rgba(0,0,0,0.25);
+    }
+    input, button, textarea { font-family: inherit; }
+    input:focus { outline: none; }
+    button { cursor: pointer; }
+    ::-webkit-scrollbar { display: none; }
+
+    @keyframes slideUp {
+      from { transform: translateY(100%); opacity: 0; }
+      to   { transform: translateY(0);    opacity: 1; }
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
+    .modal-sheet { animation: slideUp 0.32s cubic-bezier(0.32, 0.72, 0, 1) both; }
+    .modal-backdrop { animation: fadeIn 0.2s ease both; }
+
+    .tab-btn { transition: color 0.15s, border-color 0.15s; }
+    .record-item { transition: background 0.1s; }
+    .record-item:hover { background: #F5F4F0; border-radius: 12px; }
+    .star-btn { transition: transform 0.1s; }
+    .star-btn:hover { transform: scale(1.15); }
+    .save-btn { transition: opacity 0.15s, transform 0.1s; }
+    .save-btn:hover { opacity: 0.9; transform: translateY(-1px); }
+    .save-btn:active { transform: translateY(0); }
+    .add-btn:hover { opacity: 0.8; }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useRef } = React;
+
+/* ─── tokens ─── */
+const C = {
+  bg: '#FAFAF8', surface: '#FFFFFF', surface2: '#F5F4F0',
+  primary: '#4F86C6', primarySoft: '#E8F0FA', primaryHover: '#3F6FA8',
+  navy: '#1A1A2E', navySoft: 'rgba(26,26,46,0.06)',
+  text: '#1A1A2E', textSec: '#6B7280', textTer: '#9CA3AF',
+  border: '#E5E7EB', borderStrong: '#D1D5DB',
+  orange: '#F4A261', success: '#4F9D7A', successSoft: '#E6F1EB',
+  danger: '#C8553D', dangerSoft: '#F7E4DF',
+};
+
+const PALETTES = {
+  sage:   ['#8BAF8F','#6D9271'],
+  ink:    ['#4A4E69','#3A3E59'],
+  orange: ['#F4A261','#E08A45'],
+  plum:   ['#9B72A8','#7D5A88'],
+  blue:   ['#4F86C6','#3F6FA8'],
+  sand:   ['#C4A882','#A08A64'],
+};
+
+/* ─── sample data ─── */
+const RECORDS = [
+  { id:1, title:'작별하지 않는다', author:'한강',        rating:5, date:'2026.03.12', genre:'소설', color:'sage',   review:'한강 작가 특유의 문체가 마음을 울리는…' },
+  { id:2, title:'데미안',           author:'헤르만 헤세', rating:4, date:'2026.02.28', genre:'고전', color:'ink',    review:'성장의 의미를 다시 한번 되새기게 되는…' },
+  { id:3, title:'달까지 가자',      author:'장류진',      rating:4, date:'2026.02.10', genre:'소설', color:'orange', review:'현실적인 직장인 이야기가 공감 100%…'    },
+  { id:4, title:'82년생 김지영',    author:'조남주',      rating:3, date:'2026.01.22', genre:'소설', color:'plum',   review:'공감되는 부분이 많아서 읽는 내내…'      },
+];
+
+/* ─── icons (SVG inline) ─── */
+const Icon = ({ name, size=22, color=C.textTer, sw=1.8 }) => {
+  const p = { width:size, height:size, viewBox:'0 0 24 24', fill:'none',
+    stroke:color, strokeWidth:sw, strokeLinecap:'round', strokeLinejoin:'round' };
+  switch(name){
+    case 'home':   return <svg {...p}><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20a1 1 0 0 0 1 1h4v-5h4v5h4a1 1 0 0 0 1-1V9.5"/></svg>;
+    case 'search': return <svg {...p}><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>;
+    case 'swap':   return <svg {...p}><path d="M7 4 3 8l4 4"/><path d="M3 8h13a4 4 0 0 1 4 4"/><path d="m17 20 4-4-4-4"/><path d="M21 16H8a4 4 0 0 1-4-4"/></svg>;
+    case 'chat':   return <svg {...p}><path d="M21 12a8 8 0 0 1-12.2 6.8L3 20l1.2-5.8A8 8 0 1 1 21 12z"/></svg>;
+    case 'user':   return <svg {...p}><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>;
+    case 'close':  return <svg {...p}><path d="M18 6 6 18"/><path d="M6 6l12 12"/></svg>;
+    case 'plus':   return <svg {...p}><path d="M12 5v14"/><path d="M5 12h14"/></svg>;
+    case 'book':   return <svg {...p}><path d="M4 5a2 2 0 0 1 2-2h11v15H6a2 2 0 0 0-2 2V5z"/><path d="M4 19a2 2 0 0 1 2-2h11"/></svg>;
+    case 'cal':    return <svg {...p}><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>;
+    case 'star':   return <svg {...p}><path d="m12 3 2.7 5.5 6.1.9-4.4 4.3 1 6.1-5.4-2.9-5.4 2.9 1-6.1L3.2 9.4l6.1-.9z" fill={color}/></svg>;
+    default:       return null;
+  }
+};
+
+/* ─── BookCover ─── */
+function BookCover({ title, color, w=56, h=80 }) {
+  const [g1, g2] = PALETTES[color] || PALETTES.blue;
+  return (
+    <div style={{
+      width:w, height:h, borderRadius:10, flexShrink:0,
+      background:`linear-gradient(145deg, ${g1}, ${g2})`,
+      display:'flex', alignItems:'center', justifyContent:'center', padding:6,
+      boxShadow:`0 4px 14px ${g2}55`,
+      position:'relative', overflow:'hidden',
+    }}>
+      {/* subtle texture line */}
+      <div style={{position:'absolute',top:0,left:0,right:0,height:1,background:'rgba(255,255,255,0.18)'}}/>
+      <span style={{
+        fontSize:8.5, fontWeight:700, color:'rgba(255,255,255,0.92)',
+        textAlign:'center', lineHeight:1.4, wordBreak:'keep-all',
+        display:'-webkit-box', WebkitLineClamp:5, WebkitBoxOrient:'vertical',
+        overflow:'hidden',
+      }}>{title}</span>
+    </div>
+  );
+}
+
+/* ─── Stars ─── */
+function Stars({ rating, max=5, size=13, interactive=false, onSelect }) {
+  return (
+    <div style={{display:'flex', gap:2}}>
+      {Array.from({length:max},(_,i) => (
+        <span key={i}
+          className={interactive ? 'star-btn' : ''}
+          onClick={() => interactive && onSelect?.(i+1)}
+          style={{
+            fontSize:size, lineHeight:1,
+            color: i < rating ? C.orange : '#D1D5DB',
+            cursor: interactive ? 'pointer' : 'default',
+            display:'block',
+          }}
+        >★</span>
+      ))}
+    </div>
+  );
+}
+
+/* ─── Genre Badge ─── */
+function Badge({ label, variant='blue' }) {
+  const s = {
+    blue:  { bg:C.primarySoft,  color:C.primary },
+    green: { bg:C.successSoft,  color:C.success },
+    navy:  { bg:C.navySoft,     color:C.navy    },
+  }[variant] || { bg:C.primarySoft, color:C.primary };
+  return (
+    <span style={{
+      fontSize:11, fontWeight:600, color:s.color, background:s.bg,
+      borderRadius:999, padding:'2px 9px', letterSpacing:-0.1,
+    }}>#{label}</span>
+  );
+}
+
+/* ─── Record Item ─── */
+function RecordItem({ r, last }) {
+  return (
+    <div className="record-item" style={{
+      display:'flex', gap:14, padding:'15px 4px',
+      borderBottom: last ? 'none' : `1px solid ${C.border}`,
+    }}>
+      <BookCover title={r.title} color={r.color} />
+
+      <div style={{flex:1, minWidth:0}}>
+        {/* title */}
+        <div style={{
+          fontSize:15, fontWeight:700, color:C.text,
+          letterSpacing:-0.3, whiteSpace:'nowrap',
+          overflow:'hidden', textOverflow:'ellipsis',
+        }}>{r.title}</div>
+
+        {/* author */}
+        <div style={{fontSize:13, color:C.textSec, marginTop:2}}>{r.author}</div>
+
+        {/* stars */}
+        <div style={{marginTop:6}}>
+          <Stars rating={r.rating} size={14}/>
+        </div>
+
+        {/* date + genre */}
+        <div style={{display:'flex', alignItems:'center', gap:7, marginTop:6, flexWrap:'wrap'}}>
+          <span style={{fontSize:12, color:C.textTer, display:'flex', alignItems:'center', gap:3}}>
+            <Icon name="cal" size={11} color={C.textTer} sw={1.8}/>
+            {r.date}
+          </span>
+          <Badge label={r.genre}/>
+        </div>
+
+        {/* review */}
+        <div style={{
+          fontSize:13, color:C.textSec, fontStyle:'italic', marginTop:6,
+          whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis',
+          lineHeight:1.5,
+        }}>"{r.review}"</div>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Add Modal ─── */
+function AddModal({ onClose }) {
+  const [rating, setRating] = useState(0);
+  const [search, setSearch] = useState('');
+  const [date, setDate]     = useState('2026-04-26');
+  const [review, setReview] = useState('');
+  const [focused, setFocused] = useState('');
+
+  const inputStyle = (name) => ({
+    width:'100%', height:46,
+    border:`1.5px solid ${focused===name ? C.primary : C.border}`,
+    borderRadius:12, padding:'0 14px', fontSize:14,
+    color:C.text, background:C.surface2, outline:'none',
+    transition:'border-color 0.15s',
+  });
+
+  return (
+    <>
+      <div className="modal-backdrop" onClick={onClose} style={{
+        position:'absolute', inset:0, background:'rgba(15,15,25,0.45)', zIndex:100,
+      }}/>
+
+      <div className="modal-sheet" style={{
+        position:'absolute', bottom:0, left:0, right:0, zIndex:101,
+        background:C.surface, borderRadius:'22px 22px 0 0',
+        padding:'0 20px 44px',
+        boxShadow:'0 -8px 40px rgba(0,0,0,0.14)',
+      }}>
+        {/* handle */}
+        <div style={{width:36,height:4,borderRadius:2,background:C.borderStrong,margin:'12px auto 0'}}/>
+
+        {/* header */}
+        <div style={{
+          display:'flex', alignItems:'center', justifyContent:'space-between',
+          padding:'18px 0 4px',
+        }}>
+          <div style={{display:'flex', alignItems:'center', gap:8}}>
+            <div style={{
+              width:32, height:32, borderRadius:10,
+              background:C.primarySoft, display:'flex', alignItems:'center', justifyContent:'center',
+            }}>
+              <Icon name="book" size={16} color={C.primary} sw={2}/>
+            </div>
+            <span style={{fontSize:17, fontWeight:800, color:C.text, letterSpacing:-0.4}}>
+              독서 기록 추가
+            </span>
+          </div>
+          <button onClick={onClose} style={{background:'none',border:'none',padding:4}}>
+            <Icon name="close" size={20} color={C.textSec} sw={2}/>
+          </button>
+        </div>
+
+        {/* divider */}
+        <div style={{height:1, background:C.border, margin:'14px 0'}}/>
+
+        {/* search */}
+        <div style={{marginBottom:16}}>
+          <label style={{fontSize:12, fontWeight:600, color:C.textSec, display:'block', marginBottom:7, letterSpacing:-0.1}}>
+            책 검색
+          </label>
+          <div style={{position:'relative'}}>
+            <input
+              value={search}
+              onChange={e=>setSearch(e.target.value)}
+              onFocus={()=>setFocused('search')}
+              onBlur={()=>setFocused('')}
+              placeholder="제목 또는 ISBN으로 검색…"
+              style={{...inputStyle('search'), paddingLeft:40}}
+            />
+            <div style={{position:'absolute', left:13, top:'50%', transform:'translateY(-50%)'}}>
+              <Icon name="search" size={16} color={focused==='search'? C.primary : C.textTer} sw={2}/>
+            </div>
+          </div>
+        </div>
+
+        {/* stars interactive */}
+        <div style={{marginBottom:16}}>
+          <label style={{fontSize:12, fontWeight:600, color:C.textSec, display:'block', marginBottom:8, letterSpacing:-0.1}}>
+            별점
+          </label>
+          <div style={{
+            display:'flex', alignItems:'center', gap:4,
+            background:C.surface2, borderRadius:12, padding:'10px 14px',
+          }}>
+            {[1,2,3,4,5].map(n=>(
+              <span key={n} className="star-btn"
+                onClick={()=>setRating(n)}
+                style={{
+                  fontSize:30, lineHeight:1, display:'block',
+                  color: n<=rating ? C.orange : C.border,
+                  cursor:'pointer', userSelect:'none',
+                  textShadow: n<=rating ? `0 2px 6px ${C.orange}66` : 'none',
+                  transition:'color 0.12s, text-shadow 0.12s',
+                }}
+              >★</span>
+            ))}
+            {rating > 0 && (
+              <span style={{fontSize:13, fontWeight:700, color:C.textSec, marginLeft:8}}>
+                {['','★','★★','★★★','★★★★','★★★★★'][rating]} ({rating}.0)
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* date */}
+        <div style={{marginBottom:16}}>
+          <label style={{fontSize:12, fontWeight:600, color:C.textSec, display:'block', marginBottom:7, letterSpacing:-0.1}}>
+            읽은 날짜
+          </label>
+          <div style={{position:'relative'}}>
+            <input type="date" value={date} onChange={e=>setDate(e.target.value)}
+              onFocus={()=>setFocused('date')}
+              onBlur={()=>setFocused('')}
+              style={{...inputStyle('date'), paddingLeft:40, colorScheme:'light'}}
+            />
+            <div style={{position:'absolute',left:13,top:'50%',transform:'translateY(-50%)'}}>
+              <Icon name="cal" size={16} color={focused==='date'? C.primary : C.textTer} sw={2}/>
+            </div>
+          </div>
+        </div>
+
+        {/* review */}
+        <div style={{marginBottom:24}}>
+          <label style={{fontSize:12, fontWeight:600, color:C.textSec, display:'flex', alignItems:'center', gap:6, marginBottom:7, letterSpacing:-0.1}}>
+            한줄 감상
+            <span style={{fontSize:11, fontWeight:400, color:C.textTer}}>(선택)</span>
+          </label>
+          <input
+            value={review}
+            onChange={e=>setReview(e.target.value)}
+            onFocus={()=>setFocused('review')}
+            onBlur={()=>setFocused('')}
+            placeholder="이 책에 대한 한줄 감상을 남겨보세요…"
+            style={inputStyle('review')}
+          />
+        </div>
+
+        {/* save */}
+        <button className="save-btn" style={{
+          width:'100%', height:52, background:C.primary, border:'none',
+          borderRadius:14, color:'#fff', fontSize:15, fontWeight:700,
+          letterSpacing:-0.2, boxShadow:`0 4px 16px ${C.primary}44`,
+        }}>
+          저장하기
+        </button>
+      </div>
+    </>
+  );
+}
+
+/* ─── Tab Bar ─── */
+const TABS = [
+  { key:'home',   label:'홈'   },
+  { key:'search', label:'검색' },
+  { key:'swap',   label:'교환' },
+  { key:'chat',   label:'채팅' },
+  { key:'user',   label:'마이' },
+];
+
+function TabBar({ active, onTab }) {
+  return (
+    <div style={{
+      position:'absolute', bottom:0, left:0, right:0,
+      background:C.surface, borderTop:`1px solid ${C.border}`,
+      display:'flex', justifyContent:'space-around',
+      padding:'8px 0 28px', zIndex:50,
+    }}>
+      {TABS.map(t=>{
+        const isActive = t.key===active;
+        return (
+          <button key={t.key} onClick={()=>onTab(t.key)} style={{
+            display:'flex', flexDirection:'column', alignItems:'center', gap:3,
+            background:'none', border:'none', padding:'4px 12px',
+          }}>
+            <Icon name={t.key} size={22} color={isActive ? C.primary : C.textTer} sw={isActive ? 2 : 1.8}/>
+            <span style={{
+              fontSize:10, fontWeight: isActive ? 700 : 500,
+              color: isActive ? C.primary : C.textTer,
+              letterSpacing:-0.1,
+            }}>{t.label}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ─── App ─── */
+function App() {
+  const [filterTab, setFilterTab] = useState('전체');
+  const [navTab,    setNavTab]    = useState('user');
+  const [showModal, setShowModal] = useState(false);
+
+  const FILTER_TABS = ['전체','2026','2025'];
+
+  const filtered = RECORDS.filter(r => {
+    if (filterTab === '전체') return true;
+    return r.date.startsWith(filterTab);
+  });
+
+  return (
+    <div style={{position:'relative', height:'100vh', display:'flex', flexDirection:'column', background:C.bg}}>
+
+      {/* ── status bar ── */}
+      <div style={{
+        height:44, display:'flex', alignItems:'center',
+        justifyContent:'space-between', padding:'0 24px',
+        flexShrink:0,
+      }}>
+        <span style={{fontSize:13, fontWeight:700, color:C.text}}>9:41</span>
+        <div style={{display:'flex', gap:5, alignItems:'center'}}>
+          <svg width="16" height="12" viewBox="0 0 16 12" fill={C.text}>
+            <rect x="0" y="3" width="3" height="9" rx="1" opacity=".3"/>
+            <rect x="4.5" y="2" width="3" height="10" rx="1" opacity=".5"/>
+            <rect x="9" y="0" width="3" height="12" rx="1"/>
+            <rect x="14" y="1" width="2" height="10" rx="1" stroke={C.text} strokeWidth="1" fill="none"/>
+            <rect x="14.5" y="3.5" width="1" height="5" rx=".5"/>
+          </svg>
+          <svg width="15" height="12" viewBox="0 0 15 12" fill={C.text}><path d="M7.5 3a6 6 0 0 1 4.24 1.76l1.42-1.42A8 8 0 0 0 7.5 1a8 8 0 0 0-5.66 2.34l1.42 1.42A6 6 0 0 1 7.5 3z" opacity=".4"/><path d="M7.5 5a4 4 0 0 1 2.83 1.17l1.41-1.41A6 6 0 0 0 7.5 3a6 6 0 0 0-4.24 1.76l1.41 1.41A4 4 0 0 1 7.5 5z" opacity=".7"/><circle cx="7.5" cy="9.5" r="2"/></svg>
+          <span style={{fontSize:12, fontWeight:600, color:C.text}}>100%</span>
+        </div>
+      </div>
+
+      {/* ── header ── */}
+      <div style={{
+        display:'flex', alignItems:'center', justifyContent:'space-between',
+        padding:'4px 20px 14px', flexShrink:0,
+      }}>
+        <div>
+          <div style={{display:'flex', alignItems:'baseline', gap:0}}>
+            <span style={{fontSize:22, fontWeight:900, color:C.navy, letterSpacing:-0.8}}>독서</span>
+            <span style={{fontSize:22, fontWeight:900, color:C.primary, letterSpacing:-0.8, marginLeft:6}}>기록</span>
+          </div>
+          <div style={{fontSize:12, color:C.textTer, marginTop:1, letterSpacing:-0.1}}>
+            총 {RECORDS.length}권 · 올해 12권
+          </div>
+        </div>
+
+        <button className="add-btn" onClick={()=>setShowModal(true)} style={{
+          display:'flex', alignItems:'center', gap:5,
+          background:C.primary, border:'none',
+          borderRadius:20, padding:'8px 14px',
+          color:'#fff', fontSize:13, fontWeight:700,
+          boxShadow:`0 2px 10px ${C.primary}44`,
+          letterSpacing:-0.2,
+        }}>
+          <Icon name="plus" size={14} color="#fff" sw={2.5}/>
+          기록 추가
+        </button>
+      </div>
+
+      {/* ── stats cards ── */}
+      <div style={{padding:'0 20px 20px', flexShrink:0}}>
+        <div style={{display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10}}>
+          {[
+            { label:'올해 읽은 책', value:'12권', sub:'📚' },
+            { label:'이번 달',     value:'3권',  sub:'📅' },
+            { label:'평균 별점',   value:'4.2',  sub:'⭐' },
+          ].map(s=>(
+            <div key={s.label} style={{
+              background:C.navy, borderRadius:16,
+              padding:'16px 10px 14px',
+              display:'flex', flexDirection:'column', alignItems:'center', gap:5,
+              boxShadow:`0 4px 20px ${C.navy}30`,
+              position:'relative', overflow:'hidden',
+            }}>
+              {/* subtle glow */}
+              <div style={{
+                position:'absolute', top:-20, right:-20,
+                width:60, height:60, borderRadius:'50%',
+                background:C.primary, opacity:0.12,
+              }}/>
+              <span style={{fontSize:20}}>{s.sub}</span>
+              <span style={{
+                fontSize:20, fontWeight:900, color:'#fff',
+                letterSpacing:-0.6, lineHeight:1,
+              }}>{s.value}</span>
+              <span style={{
+                fontSize:10, color:'rgba(255,255,255,0.55)',
+                fontWeight:500, textAlign:'center', lineHeight:1.3,
+              }}>{s.label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── filter tabs ── */}
+      <div style={{
+        display:'flex', borderBottom:`1.5px solid ${C.border}`,
+        padding:'0 20px', gap:4, flexShrink:0,
+      }}>
+        {FILTER_TABS.map(t=>(
+          <button key={t} className="tab-btn" onClick={()=>setFilterTab(t)} style={{
+            background:'none', border:'none',
+            padding:'10px 12px', fontSize:14,
+            fontWeight: t===filterTab ? 700 : 500,
+            color: t===filterTab ? C.primary : C.textTer,
+            borderBottom: t===filterTab ? `2px solid ${C.primary}` : '2px solid transparent',
+            marginBottom:-2, letterSpacing:-0.1,
+          }}>{t}</button>
+        ))}
+        <div style={{flex:1}}/>
+        <button style={{
+          background:'none', border:'none', display:'flex', alignItems:'center', gap:3,
+          fontSize:12, color:C.textTer, padding:'0 4px',
+        }}>
+          <Icon name="star" size={12} color={C.orange} sw={0}/>
+          별점순
+        </button>
+      </div>
+
+      {/* ── record list ── */}
+      <div style={{flex:1, overflowY:'auto', padding:'4px 20px', paddingBottom:100}}>
+        {filtered.length === 0 ? (
+          <div style={{textAlign:'center', padding:'60px 0', color:C.textTer}}>
+            <div style={{fontSize:32, marginBottom:12}}>📭</div>
+            <div style={{fontSize:14}}>기록이 없어요</div>
+          </div>
+        ) : (
+          filtered.map((r,i)=>(
+            <RecordItem key={r.id} r={r} last={i===filtered.length-1}/>
+          ))
+        )}
+      </div>
+
+      {/* ── tab bar ── */}
+      <TabBar active={navTab} onTab={setNavTab}/>
+
+      {/* ── modal ── */}
+      {showModal && <AddModal onClose={()=>setShowModal(false)}/>}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>

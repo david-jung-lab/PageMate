@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+  <title>PageMate — 알림</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; background: #D1D5DB; }
+    body {
+      display: flex; justify-content: center; align-items: flex-start;
+      font-family: -apple-system, BlinkMacSystemFont, 'Pretendard', 'Segoe UI', sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    #root {
+      width: 390px; min-height: 100vh; background: #FAFAF8;
+      position: relative; overflow: hidden;
+      box-shadow: 0 0 60px rgba(0,0,0,0.22);
+    }
+    input, button { font-family: inherit; }
+    button { cursor: pointer; }
+    ::-webkit-scrollbar { display: none; }
+
+    @keyframes fadeSlideIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes pulseDot {
+      0%,100% { opacity: 1; transform: scale(1); }
+      50%      { opacity: .7; transform: scale(1.3); }
+    }
+    .notif-item { animation: fadeSlideIn 0.22s ease both; }
+    .unread-dot { animation: pulseDot 2s ease infinite; }
+
+    .action-btn   { transition: opacity .12s, transform .1s; }
+    .action-btn:hover  { opacity: .85; transform: translateY(-1px); }
+    .action-btn:active { transform: translateY(0); }
+
+    .tab-btn { transition: color .15s, border-color .15s; }
+    .mark-btn { transition: opacity .15s; }
+    .mark-btn:hover { opacity: .7; }
+
+    .notif-row { transition: background .15s; }
+    .notif-row:hover { filter: brightness(0.97); }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useCallback } = React;
+
+/* ── tokens ── */
+const C = {
+  bg: '#FAFAF8', surface: '#FFFFFF', surface2: '#F5F4F0',
+  primary: '#4F86C6', primarySoft: '#E8F0FA',
+  navy: '#1A1A2E',
+  text: '#1A1A2E', textSec: '#6B7280', textTer: '#9CA3AF',
+  border: '#E5E7EB', borderStrong: '#D1D5DB',
+  success: '#4F9D7A', successSoft: '#E6F1EB',
+  danger: '#C8553D', dangerSoft: '#F7E4DF',
+  warningSoft: '#FBF3E0', warning: '#D9A441',
+};
+
+/* ── inline SVG icons ── */
+const Icon = ({ name, size=20, color=C.textTer, sw=1.8 }) => {
+  const p = {
+    width:size, height:size, viewBox:'0 0 24 24', fill:'none',
+    stroke:color, strokeWidth:sw, strokeLinecap:'round', strokeLinejoin:'round',
+  };
+  switch(name) {
+    case 'back':    return <svg {...p}><path d="m15 18-6-6 6-6"/></svg>;
+    case 'bell':    return <svg {...p}><path d="M6 8a6 6 0 1 1 12 0c0 5 2 6 2 6H4s2-1 2-6z"/><path d="M10 19a2 2 0 0 0 4 0"/></svg>;
+    case 'swap':    return <svg {...p}><path d="M7 4 3 8l4 4"/><path d="M3 8h13a4 4 0 0 1 4 4"/><path d="m17 20 4-4-4-4"/><path d="M21 16H8a4 4 0 0 1-4-4"/></svg>;
+    case 'chat':    return <svg {...p}><path d="M21 12a8 8 0 0 1-12.2 6.8L3 20l1.2-5.8A8 8 0 1 1 21 12z"/></svg>;
+    case 'check':   return <svg {...p}><path d="M20 6 9 17l-5-5"/></svg>;
+    case 'info':    return <svg {...p}><circle cx="12" cy="12" r="9"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>;
+    case 'home':    return <svg {...p}><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20a1 1 0 0 0 1 1h4v-5h4v5h4a1 1 0 0 0 1-1V9.5"/></svg>;
+    case 'search':  return <svg {...p}><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>;
+    case 'user':    return <svg {...p}><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>;
+    case 'close':   return <svg {...p}><path d="M18 6 6 18"/><path d="M6 6l12 12"/></svg>;
+    default: return null;
+  }
+};
+
+/* ── notification data ── */
+const INITIAL = [
+  {
+    id:1, type:'exchange', read:false, group:'오늘',
+    iconEmoji:'🔁', iconBg:C.primary, iconColor:'#fff',
+    title:"현우님이 '데미안' 교환을 요청했어요",
+    subtitle: null,
+    time:'방금 전', hasActions:true,
+  },
+  {
+    id:2, type:'chat', read:false, group:'오늘',
+    iconEmoji:'💬', iconBg:C.success, iconColor:'#fff',
+    title:"민지님이 메시지를 보냈어요",
+    subtitle:"혹시 직거래 가능하신가요?",
+    time:'23분 전', hasActions:false,
+  },
+  {
+    id:3, type:'exchange', read:true, group:'오늘',
+    iconEmoji:'✅', iconBg:C.borderStrong, iconColor:C.textSec,
+    title:"'작별하지 않는다' 교환이 완료됐어요 🎉",
+    subtitle: null,
+    time:'2시간 전', hasActions:false,
+  },
+  {
+    id:4, type:'system', read:true, group:'어제',
+    iconEmoji:'📢', iconBg:C.borderStrong, iconColor:C.textSec,
+    title:"내 주변 2km 내에 새로운 책 8권이 등록됐어요",
+    subtitle: null,
+    time:'어제 오후 3:20', hasActions:false,
+  },
+  {
+    id:5, type:'exchange', read:true, group:'어제',
+    iconEmoji:'🔁', iconBg:C.borderStrong, iconColor:C.textSec,
+    title:"서준님이 '데미안' 교환 요청을 수락했어요",
+    subtitle: null,
+    time:'어제 오전 11:05', hasActions:false,
+  },
+];
+
+const TYPE_FILTER = { '전체': null, '교환': 'exchange', '채팅': 'chat', '시스템': 'system' };
+const FILTER_TABS = ['전체','교환','채팅','시스템'];
+
+/* ── NotifIcon ── */
+function NotifIcon({ emoji, bg, color, read }) {
+  return (
+    <div style={{
+      width:44, height:44, borderRadius:'50%', flexShrink:0,
+      background: read ? '#F0F0EE' : bg,
+      display:'flex', alignItems:'center', justifyContent:'center',
+      fontSize:19,
+      boxShadow: read ? 'none' : `0 3px 10px ${bg}44`,
+      transition:'background .2s, box-shadow .2s',
+    }}>
+      <span>{emoji}</span>
+    </div>
+  );
+}
+
+/* ── NotifItem ── */
+function NotifItem({ n, onRead, onAction, style: extraStyle }) {
+  return (
+    <div className="notif-row" onClick={() => !n.read && onRead(n.id)}
+      style={{
+        display:'flex', gap:13, padding:'14px 20px',
+        background: n.read ? C.bg : C.surface,
+        borderLeft: n.read ? '3px solid transparent' : `3px solid ${C.primary}`,
+        position:'relative',
+        cursor: n.read ? 'default' : 'pointer',
+        ...extraStyle,
+      }}
+    >
+      {/* unread dot */}
+      {!n.read && (
+        <div className="unread-dot" style={{
+          position:'absolute', top:16, right:18,
+          width:7, height:7, borderRadius:'50%',
+          background:C.primary,
+        }}/>
+      )}
+
+      <NotifIcon emoji={n.iconEmoji} bg={n.iconBg} color={n.iconColor} read={n.read}/>
+
+      <div style={{flex:1, minWidth:0}}>
+        {/* title */}
+        <div style={{
+          fontSize:14, fontWeight: n.read ? 500 : 700,
+          color: n.read ? C.textSec : C.text,
+          letterSpacing:-0.2, lineHeight:1.45,
+        }}>{n.title}</div>
+
+        {/* subtitle */}
+        {n.subtitle && (
+          <div style={{
+            fontSize:13, color:C.textTer, marginTop:2,
+            whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis',
+            fontStyle:'italic',
+          }}>"{n.subtitle}"</div>
+        )}
+
+        {/* time */}
+        <div style={{fontSize:11, color:C.textTer, marginTop:5, fontWeight:500}}>
+          {n.time}
+        </div>
+
+        {/* action buttons — exchange request only */}
+        {n.hasActions && !n.read && (
+          <div style={{display:'flex', gap:8, marginTop:10}}>
+            <button className="action-btn"
+              onClick={e => { e.stopPropagation(); onAction(n.id,'reject'); }}
+              style={{
+                flex:1, height:34, borderRadius:8,
+                background:C.surface2, border:`1px solid ${C.borderStrong}`,
+                fontSize:13, fontWeight:700, color:C.textSec,
+              }}>거절하기</button>
+            <button className="action-btn"
+              onClick={e => { e.stopPropagation(); onAction(n.id,'accept'); }}
+              style={{
+                flex:1.4, height:34, borderRadius:8,
+                background:C.primary, border:'none',
+                fontSize:13, fontWeight:700, color:'#fff',
+                boxShadow:`0 2px 8px ${C.primary}44`,
+              }}>수락하기</button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ── SectionHeader ── */
+function SectionLabel({ label }) {
+  return (
+    <div style={{
+      padding:'10px 20px 6px',
+      fontSize:11, fontWeight:700, color:C.textTer, letterSpacing:0.4,
+      textTransform:'uppercase', background:C.bg,
+    }}>{label}</div>
+  );
+}
+
+/* ── Empty State ── */
+function EmptyState({ tab }) {
+  const msgs = {
+    '교환': ['교환 알림이 없어요','교환 요청이 오면 여기서 알려드릴게요'],
+    '채팅': ['채팅 알림이 없어요','새 메시지가 오면 여기서 알려드릴게요'],
+    '시스템': ['시스템 알림이 없어요','서비스 공지가 생기면 알려드릴게요'],
+    '전체': ['아직 알림이 없어요','교환 요청이나 채팅이 오면 알려드릴게요'],
+  };
+  const [main, sub] = msgs[tab] || msgs['전체'];
+  return (
+    <div style={{
+      flex:1, display:'flex', flexDirection:'column',
+      alignItems:'center', justifyContent:'center',
+      padding:'80px 40px', gap:12,
+    }}>
+      <div style={{
+        width:76, height:76, borderRadius:'50%',
+        background:C.surface2,
+        display:'flex', alignItems:'center', justifyContent:'center',
+        marginBottom:4,
+      }}>
+        <Icon name="bell" size={34} color={C.borderStrong} sw={1.5}/>
+      </div>
+      <div style={{fontSize:16, fontWeight:700, color:C.textSec, letterSpacing:-0.2}}>
+        {main}
+      </div>
+      <div style={{fontSize:13, color:C.textTer, textAlign:'center', lineHeight:1.6}}>
+        {sub}
+      </div>
+    </div>
+  );
+}
+
+/* ── Tab Bar ── */
+const NAV_TABS = [
+  {key:'home',label:'홈'},{key:'search',label:'검색'},
+  {key:'swap',label:'교환'},{key:'chat',label:'채팅'},
+  {key:'user',label:'마이'},
+];
+function TabBar() {
+  return (
+    <div style={{
+      position:'absolute', bottom:0, left:0, right:0,
+      background:C.surface, borderTop:`1px solid ${C.border}`,
+      display:'flex', justifyContent:'space-around',
+      padding:'8px 0 28px', zIndex:50,
+    }}>
+      {NAV_TABS.map(t=>(
+        <button key={t.key} style={{
+          display:'flex', flexDirection:'column', alignItems:'center', gap:3,
+          background:'none', border:'none', padding:'4px 10px',
+        }}>
+          <Icon name={t.key} size={22} color={C.textTer} sw={1.8}/>
+          <span style={{fontSize:10, color:C.textTer, fontWeight:500}}>{t.label}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/* ── App ── */
+function App() {
+  const [notifs, setNotifs] = useState(INITIAL);
+  const [activeTab, setActiveTab] = useState('전체');
+
+  const unreadCount = notifs.filter(n=>!n.read).length;
+
+  const markRead = useCallback(id => {
+    setNotifs(prev => prev.map(n => n.id===id ? {...n, read:true, iconBg:C.borderStrong, hasActions:false} : n));
+  }, []);
+
+  const markAllRead = () => {
+    setNotifs(prev => prev.map(n => ({...n, read:true, iconBg:C.borderStrong, hasActions:false})));
+  };
+
+  const handleAction = (id, action) => {
+    setNotifs(prev => prev.map(n => {
+      if(n.id!==id) return n;
+      const accepted = action==='accept';
+      return {
+        ...n, read:true, hasActions:false,
+        iconBg:C.borderStrong,
+        iconEmoji: accepted ? '✅' : '❌',
+        title: accepted
+          ? `'데미안' 교환 요청을 수락했어요`
+          : `'데미안' 교환 요청을 거절했어요`,
+      };
+    }));
+  };
+
+  /* filter */
+  const typeKey = TYPE_FILTER[activeTab];
+  const filtered = typeKey ? notifs.filter(n=>n.type===typeKey) : notifs;
+
+  /* group by '오늘' / '어제' */
+  const groups = {};
+  filtered.forEach(n => {
+    if(!groups[n.group]) groups[n.group] = [];
+    groups[n.group].push(n);
+  });
+  const groupOrder = ['오늘','어제'];
+
+  return (
+    <div style={{position:'relative', height:'100vh', display:'flex', flexDirection:'column', background:C.bg}}>
+
+      {/* status bar */}
+      <div style={{
+        height:44, display:'flex', alignItems:'center',
+        justifyContent:'space-between', padding:'0 22px', flexShrink:0,
+      }}>
+        <span style={{fontSize:13, fontWeight:700, color:C.text}}>9:41</span>
+        <div style={{display:'flex', gap:5, alignItems:'center'}}>
+          <svg width="16" height="11" viewBox="0 0 16 11" fill={C.text}>
+            <rect x="0" y="3" width="3" height="8" rx="1" opacity=".3"/>
+            <rect x="4.5" y="1.5" width="3" height="9.5" rx="1" opacity=".55"/>
+            <rect x="9" y="0" width="3" height="11" rx="1"/>
+            <rect x="13.5" y="1" width="2" height="9" rx="1" stroke={C.text} strokeWidth="1.2" fill="none"/>
+            <rect x="14" y="3" width="1" height="5" rx=".5"/>
+          </svg>
+          <svg width="15" height="12" viewBox="0 0 15 12" fill={C.text}>
+            <path d="M7.5 2.5a7 7 0 0 1 5 2.08l1.2-1.2A8.8 8.8 0 0 0 7.5.5a8.8 8.8 0 0 0-6.2 2.88l1.2 1.2A7 7 0 0 1 7.5 2.5z" opacity=".35"/>
+            <path d="M7.5 5a4.5 4.5 0 0 1 3.18 1.32l1.2-1.2A6.3 6.3 0 0 0 7.5 3a6.3 6.3 0 0 0-4.38 2.12l1.2 1.2A4.5 4.5 0 0 1 7.5 5z" opacity=".65"/>
+            <circle cx="7.5" cy="9.5" r="2"/>
+          </svg>
+          <span style={{fontSize:12, fontWeight:600, color:C.text}}>100%</span>
+        </div>
+      </div>
+
+      {/* header */}
+      <div style={{
+        display:'flex', alignItems:'center', justifyContent:'space-between',
+        padding:'2px 16px 10px', flexShrink:0,
+      }}>
+        <button style={{
+          width:36, height:36, borderRadius:10,
+          background:C.surface2, border:'none',
+          display:'flex', alignItems:'center', justifyContent:'center',
+        }}>
+          <Icon name="back" size={20} color={C.text} sw={2.2}/>
+        </button>
+
+        <div style={{display:'flex', flexDirection:'column', alignItems:'center', gap:2}}>
+          <span style={{fontSize:17, fontWeight:800, color:C.text, letterSpacing:-0.5}}>
+            알림
+          </span>
+          {unreadCount > 0 && (
+            <span style={{
+              fontSize:10, fontWeight:700, color:C.primary,
+              background:C.primarySoft, borderRadius:999,
+              padding:'1px 7px', letterSpacing:-0.1,
+            }}>
+              {unreadCount}개 안 읽음
+            </span>
+          )}
+        </div>
+
+        <button className="mark-btn" onClick={markAllRead} style={{
+          background:'none', border:'none',
+          fontSize:13, fontWeight:600, color:C.textSec,
+          padding:'6px 2px', letterSpacing:-0.2,
+          opacity: unreadCount===0 ? 0.35 : 1,
+        }}>
+          모두 읽음
+        </button>
+      </div>
+
+      {/* filter tabs */}
+      <div style={{
+        display:'flex', borderBottom:`1.5px solid ${C.border}`,
+        padding:'0 20px', gap:2, flexShrink:0,
+        overflowX:'auto',
+      }}>
+        {FILTER_TABS.map(t => {
+          const isActive = t===activeTab;
+          const typeK = TYPE_FILTER[t];
+          const count = typeK
+            ? notifs.filter(n=>n.type===typeK && !n.read).length
+            : notifs.filter(n=>!n.read).length;
+          return (
+            <button key={t} className="tab-btn" onClick={()=>setActiveTab(t)} style={{
+              background:'none', border:'none',
+              padding:'10px 10px', fontSize:13,
+              fontWeight: isActive ? 700 : 500,
+              color: isActive ? C.primary : C.textTer,
+              borderBottom: isActive ? `2px solid ${C.primary}` : '2px solid transparent',
+              marginBottom:-2, letterSpacing:-0.1,
+              display:'flex', alignItems:'center', gap:5,
+              flexShrink:0,
+            }}>
+              {t}
+              {count > 0 && (
+                <span style={{
+                  fontSize:10, fontWeight:700,
+                  background: isActive ? C.primary : C.borderStrong,
+                  color: isActive ? '#fff' : C.textSec,
+                  borderRadius:999, padding:'1px 5px', minWidth:16, textAlign:'center',
+                  lineHeight:'14px', display:'inline-block',
+                }}>
+                  {count}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* content */}
+      <div style={{flex:1, overflowY:'auto', paddingBottom:88}}>
+        {filtered.length === 0 ? (
+          <EmptyState tab={activeTab}/>
+        ) : (
+          groupOrder.map(group => {
+            const items = groups[group];
+            if(!items || items.length===0) return null;
+            return (
+              <div key={group}>
+                <SectionLabel label={group}/>
+                {items.map((n, idx) => (
+                  <div key={n.id} className="notif-item"
+                    style={{animationDelay:`${idx*0.04}s`}}>
+                    <NotifItem
+                      n={n}
+                      onRead={markRead}
+                      onAction={handleAction}
+                      style={idx < items.length-1
+                        ? {borderBottom:`1px solid ${C.border}`}
+                        : {}}
+                    />
+                  </div>
+                ))}
+              </div>
+            );
+          })
+        )}
+
+        {/* section demo: empty state preview */}
+        {filtered.length > 0 && activeTab==='전체' && (
+          <div style={{
+            margin:'16px 20px 0',
+            borderRadius:14, border:`1.5px dashed ${C.border}`,
+            padding:'20px', display:'flex', flexDirection:'column',
+            alignItems:'center', gap:8,
+          }}>
+            <div style={{
+              width:48, height:48, borderRadius:'50%',
+              background:C.surface2,
+              display:'flex', alignItems:'center', justifyContent:'center',
+            }}>
+              <Icon name="bell" size={22} color={C.borderStrong} sw={1.5}/>
+            </div>
+            <div style={{fontSize:13, fontWeight:700, color:C.textSec}}>
+              아직 알림이 없어요
+            </div>
+            <div style={{fontSize:12, color:C.textTer, textAlign:'center', lineHeight:1.6}}>
+              교환 요청이나 채팅이 오면 알려드릴게요
+            </div>
+            <span style={{
+              fontSize:10, color:C.textTer, marginTop:2,
+              background:C.surface2, borderRadius:6, padding:'2px 8px',
+            }}>빈 상태 미리보기</span>
+          </div>
+        )}
+
+        <div style={{height:20}}/>
+      </div>
+
+      <TabBar/>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
