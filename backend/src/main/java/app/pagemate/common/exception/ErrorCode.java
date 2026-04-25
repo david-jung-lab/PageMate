@@ -35,6 +35,7 @@ public enum ErrorCode {
 
     // Reading Record
     READING_RECORD_NOT_FOUND("독서 기록을 찾을 수 없습니다.", HttpStatus.NOT_FOUND),
+    READING_RECORD_ACCESS_DENIED("본인 독서 기록만 수정·삭제할 수 있습니다.", HttpStatus.FORBIDDEN),
 
     // Common
     VALIDATION_ERROR("요청 값 검증에 실패했습니다.", HttpStatus.BAD_REQUEST),
