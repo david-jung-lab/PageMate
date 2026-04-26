@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {
-  View, Text, TextInput, ScrollView, TouchableOpacity,
+  View, Text, TextInput, ScrollView, TouchableOpacity, Image,
   StyleSheet, SafeAreaView, StatusBar, ActivityIndicator, Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -128,13 +128,10 @@ export default function NewBookScreen() {
               onPress={() => handleKakaoSelect(item)}
               activeOpacity={0.8}
             >
-              <PMBookCover
-                title={item.title}
-                author={item.authors.join(', ')}
-                color="sage"
-                width={40}
-                height={58}
-              />
+              {item.thumbnail
+                ? <Image source={{ uri: item.thumbnail }} style={styles.kakaoThumb} resizeMode="cover" />
+                : <PMBookCover title={item.title} author={item.authors.join(', ')} color="sage" width={40} height={58} />
+              }
               <View style={styles.kakaoMeta}>
                 <Text style={styles.kakaoTitle} numberOfLines={1}>{item.title}</Text>
                 <Text style={styles.kakaoAuthor} numberOfLines={1}>{item.authors.join(', ')}</Text>
@@ -146,13 +143,10 @@ export default function NewBookScreen() {
 
         {/* 표지 미리보기 */}
         <View style={styles.previewSection}>
-          <PMBookCover
-            title={title || '제목'}
-            author={author || '저자'}
-            color={coverColor}
-            width={100}
-            height={144}
-          />
+          {selectedKakao?.thumbnail
+            ? <Image source={{ uri: selectedKakao.thumbnail }} style={styles.previewImg} resizeMode="cover" />
+            : <PMBookCover title={title || '제목'} author={author || '저자'} color={coverColor} width={100} height={144} />
+          }
         </View>
 
         {/* 기본 정보 */}
@@ -336,6 +330,18 @@ const styles = StyleSheet.create({
   },
   searchBtnText: { fontSize: 13, fontWeight: '700', color: '#fff' },
 
+  kakaoThumb: {
+    width: 40,
+    height: 58,
+    borderRadius: 4,
+    flexShrink: 0,
+    backgroundColor: colors.border,
+  },
+  previewImg: {
+    width: 100,
+    height: 144,
+    borderRadius: 8,
+  },
   kakaoItem: {
     flexDirection: 'row',
     gap: 12,

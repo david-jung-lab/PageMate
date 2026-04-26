@@ -256,8 +256,8 @@ const ProfileScreen: React.FC = () => {
             <SectionHeader title="내가 등록한 책" action="전체보기" />
             <ScrollView horizontal showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.booksRow}>
-              {books.map((b) => <MyBookCard key={b.id} book={b} />)}
               <AddBookTile />
+              {books.map((b) => <MyBookCard key={b.id} book={b} />)}
             </ScrollView>
 
             <SectionHeader title="독서 기록" action="기록 추가"
