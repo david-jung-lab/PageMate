@@ -33,14 +33,7 @@ public class Message {
     @Column(name = "message_type", nullable = false)
     private MessageType messageType;
 
-    @Column(name = "is_read", nullable = false)
-    private boolean isRead;
-
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
-
-    public void markRead() {
-        this.isRead = true;
-    }
 }

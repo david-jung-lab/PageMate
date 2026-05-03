@@ -10,7 +10,6 @@ public record MessageResponse(
         String senderNickname,
         String content,
         String messageType,
-        boolean isRead,
         LocalDateTime createdAt
 ) {
     public static MessageResponse of(Message m) {
@@ -20,7 +19,6 @@ public record MessageResponse(
                 m.getSender() != null ? m.getSender().getNickname() : null,
                 m.getContent(),
                 m.getMessageType().name(),
-                m.isRead(),
                 m.getCreatedAt()
         );
     }
