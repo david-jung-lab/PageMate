@@ -60,6 +60,13 @@ public class User {
     @Column(precision = 10, scale = 7)
     private BigDecimal lng;
 
+    @Column(name = "is_onboarded", nullable = false)
+    @Builder.Default
+    private boolean isOnboarded = false;
+
+    @Column(name = "fcm_token")
+    private String fcmToken;
+
     @Column(name = "refresh_token")
     private String refreshToken;
 
@@ -76,6 +83,14 @@ public class User {
     @UpdateTimestamp
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+
+    public void completeOnboarding() {
+        this.isOnboarded = true;
+    }
+
+    public void updateFcmToken(String fcmToken) {
+        this.fcmToken = fcmToken;
+    }
 
     public void updateRefreshToken(String refreshToken) {
         this.refreshToken = refreshToken;

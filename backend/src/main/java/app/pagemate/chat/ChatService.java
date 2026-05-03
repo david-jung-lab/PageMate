@@ -22,6 +22,7 @@ public class ChatService {
 
     private final ChatRoomRepository chatRoomRepository;
     private final MessageRepository messageRepository;
+    private final ChatRoomParticipantRepository participantRepository;
     private final UserRepository userRepository;
     private final BookRepository bookRepository;
     private final SimpMessagingTemplate messagingTemplate;
@@ -31,20 +32,20 @@ public class ChatService {
         Book book = bookRepository.findById(bookId)
                 .orElseThrow(() -> new PagemateException(ErrorCode.BOOK_NOT_FOUND));
 
-        // 이미 채팅방이 있으면 기존 방 반환
         return chatRoomRepository.findByBookIdAndRequesterId(bookId, requesterId)
-                .map(room -> ChatRoomSummaryResponse.of(room, requesterId, 0))
+                .map(room -> {
+                    long unread = getUnreadCount(room.getId(), requesterId);
+                    return ChatRoomSummaryResponse.of(room, requesterId, unread);
+                })
                 .orElseGet(() -> {
                     User requester = userRepository.findById(requesterId)
                             .orElseThrow(() -> new PagemateException(ErrorCode.USER_NOT_FOUND));
-                    ChatRoom room = ChatRoom.builder()
+                    ChatRoom room = chatRoomRepository.save(ChatRoom.builder()
                             .book(book)
                             .requester(requester)
                             .owner(book.getOwner())
-                            .build();
-                    chatRoomRepository.save(room);
-
-                    // 시스템 메시지 자동 발송
+                            .build());
+                    initParticipants(room, requester, book.getOwner());
                     sendSystemMessage(room, "교환 요청이 시작되었어요.");
                     return ChatRoomSummaryResponse.of(room, requesterId, 0);
                 });
@@ -53,7 +54,7 @@ public class ChatService {
     public List<ChatRoomSummaryResponse> getRooms(Long userId) {
         return chatRoomRepository.findAllByUserId(userId).stream()
                 .map(room -> {
-                    long unread = messageRepository.countUnread(room.getId(), userId);
+                    long unread = getUnreadCount(room.getId(), userId);
                     return ChatRoomSummaryResponse.of(room, userId, unread);
                 })
                 .toList();
@@ -90,15 +91,15 @@ public class ChatService {
         User sender = userRepository.findById(senderId)
                 .orElseThrow(() -> new PagemateException(ErrorCode.USER_NOT_FOUND));
 
-        Message message = Message.builder()
+        Message message = messageRepository.save(Message.builder()
                 .chatRoom(room)
                 .sender(sender)
                 .content(content)
                 .messageType(MessageType.TEXT)
-                .isRead(false)
-                .build();
-        messageRepository.save(message);
+                .build());
+
         room.updateLastMessage(content);
+        markReadForUser(room.getId(), senderId, message.getId());
 
         MessageResponse response = MessageResponse.of(message);
         messagingTemplate.convertAndSend("/topic/chat/" + roomId, response);
@@ -112,18 +113,37 @@ public class ChatService {
         if (!room.isParticipant(userId)) {
             throw new PagemateException(ErrorCode.CHAT_ACCESS_DENIED);
         }
-        messageRepository.markAllAsRead(roomId, userId);
+        messageRepository.findLatestByRoomId(roomId)
+                .ifPresent(latest -> markReadForUser(roomId, userId, latest.getId()));
+    }
+
+    private void initParticipants(ChatRoom room, User requester, User owner) {
+        participantRepository.save(ChatRoomParticipant.builder()
+                .id(new ChatRoomParticipantId(room.getId(), requester.getId()))
+                .chatRoom(room).user(requester).build());
+        participantRepository.save(ChatRoomParticipant.builder()
+                .id(new ChatRoomParticipantId(room.getId(), owner.getId()))
+                .chatRoom(room).user(owner).build());
+    }
+
+    private void markReadForUser(Long roomId, Long userId, Long messageId) {
+        participantRepository.findByRoomIdAndUserId(roomId, userId)
+                .ifPresent(p -> p.markRead(messageId));
+    }
+
+    private long getUnreadCount(Long roomId, Long userId) {
+        return participantRepository.findByRoomIdAndUserId(roomId, userId)
+                .map(p -> messageRepository.countUnreadAfter(roomId, p.getLastReadMessageId()))
+                .orElse(0L);
     }
 
     private void sendSystemMessage(ChatRoom room, String content) {
-        Message message = Message.builder()
+        Message message = messageRepository.save(Message.builder()
                 .chatRoom(room)
                 .sender(null)
                 .content(content)
                 .messageType(MessageType.SYSTEM)
-                .isRead(true)
-                .build();
-        messageRepository.save(message);
+                .build());
         room.updateLastMessage(content);
         messagingTemplate.convertAndSend("/topic/chat/" + room.getId(), MessageResponse.of(message));
     }

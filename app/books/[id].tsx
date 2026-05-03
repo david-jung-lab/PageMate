@@ -17,8 +17,7 @@ import PMAvatar from '../../src/components/ui/PMAvatar';
 import { booksApi } from '../../src/features/books/api';
 import { profileApi } from '../../src/features/profile/api';
 import { exchangeApi } from '../../src/features/exchange/api';
-import { CONDITION_LABELS, STATUS_LABELS } from '../../src/constants';
-import { BookSummary, CoverColor } from '../../src/features/books/types';
+import { BookSummary } from '../../src/features/books/types';
 import { useAuthStore } from '../../src/store';
 
 /* 커버 컬러 → 연한 파스텔 (히어로 그라데이션 시작 색) */
@@ -26,14 +25,6 @@ const COVER_PASTEL: Record<string, string> = {
   blue: '#DDE8F5', orange: '#FDE9D4', sage: '#DDE8DC',
   plum: '#EBE0EF', sand: '#F0E8DC', ink: '#CDD0D6',
 };
-
-/* 더미 도서 (다른 책 섹션 자리 채우기) */
-type MiniBook = { id: number; title: string; author: string; coverColor: CoverColor; imageUrl: string | null };
-const DUMMY_BOOKS: MiniBook[] = [
-  { id: -1, title: '소년이 온다', author: '한강', coverColor: 'ink', imageUrl: null },
-  { id: -2, title: '흰', author: '한강', coverColor: 'sand', imageUrl: null },
-  { id: -3, title: '채식주의자', author: '한강', coverColor: 'sage', imageUrl: null },
-];
 
 export default function BookDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -51,22 +42,12 @@ export default function BookDetailScreen() {
     enabled: !!id,
   });
 
-  const { data: ownerBooksData } = useQuery({
-    queryKey: ['userBooks', book?.owner.id],
-    queryFn: () => profileApi.getUserBooks(book!.owner.id, 0, 10),
-    enabled: !!book?.owner.id,
-  });
-
   const { data: myBooksData, isLoading: myBooksLoading } = useQuery({
     queryKey: ['myBooks', 'available'],
     queryFn: () => profileApi.getMyBooks(0, 50, 'AVAILABLE'),
     enabled: modalVisible,
   });
 
-  const otherBooks: MiniBook[] = (ownerBooksData?.content ?? [])
-    .filter(b => b.id !== Number(id))
-    .slice(0, 6)
-    .map(b => ({ id: b.id, title: b.title, author: b.author, coverColor: b.coverColor, imageUrl: b.imageUrl }));
   const myAvailableBooks = (myBooksData?.content ?? []).filter(
     b => b.id !== Number(id)
   );

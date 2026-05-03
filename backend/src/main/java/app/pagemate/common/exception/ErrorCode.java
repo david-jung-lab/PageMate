@@ -33,10 +33,6 @@ public enum ErrorCode {
     CHAT_ROOM_NOT_FOUND("채팅방을 찾을 수 없습니다.", HttpStatus.NOT_FOUND),
     CHAT_ACCESS_DENIED("채팅방 참여자만 접근할 수 있습니다.", HttpStatus.FORBIDDEN),
 
-    // Reading Record
-    READING_RECORD_NOT_FOUND("독서 기록을 찾을 수 없습니다.", HttpStatus.NOT_FOUND),
-    READING_RECORD_ACCESS_DENIED("본인 독서 기록만 수정·삭제할 수 있습니다.", HttpStatus.FORBIDDEN),
-
     // Notification
     NOTIFICATION_NOT_FOUND("알림을 찾을 수 없습니다.", HttpStatus.NOT_FOUND),
     NOTIFICATION_ACCESS_DENIED("본인 알림에만 접근할 수 있습니다.", HttpStatus.FORBIDDEN),

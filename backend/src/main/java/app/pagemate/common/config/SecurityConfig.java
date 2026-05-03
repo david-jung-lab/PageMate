@@ -53,7 +53,8 @@ public class SecurityConfig {
                 })
             )
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/v1/auth/**").permitAll()
+                .requestMatchers("/v1/auth/oauth/**", "/v1/auth/refresh").permitAll()
+                .requestMatchers("/v1/auth/logout").authenticated()
                 .requestMatchers(HttpMethod.GET, "/books/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/v1/users/me", "/v1/users/me/books").authenticated()
                 .requestMatchers(HttpMethod.GET, "/v1/users/*/books", "/v1/users/*").permitAll()
