@@ -4,10 +4,15 @@ import app.pagemate.auth.dto.AuthResponse;
 import app.pagemate.auth.dto.OAuthRequest;
 import app.pagemate.auth.dto.RefreshRequest;
 import app.pagemate.common.response.ApiResponse;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+
+import java.io.IOException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 
 @RestController
 @RequestMapping("/v1/auth")
@@ -15,6 +20,15 @@ import org.springframework.web.bind.annotation.*;
 public class AuthController {
 
     private final AuthService authService;
+
+    @GetMapping("/oauth/kakao/callback")
+    public void kakaoCallback(
+            @RequestParam String code,
+            HttpServletResponse response
+    ) throws IOException {
+        String encoded = URLEncoder.encode(code, StandardCharsets.UTF_8);
+        response.sendRedirect("pagemate://oauth?code=" + encoded + "&provider=kakao");
+    }
 
     @PostMapping("/oauth/kakao")
     public ApiResponse<AuthResponse> kakaoLogin(@Valid @RequestBody OAuthRequest request) {
