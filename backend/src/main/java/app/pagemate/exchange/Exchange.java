@@ -44,6 +44,12 @@ public class Exchange {
     @Builder.Default
     private ExchangeStatus status = ExchangeStatus.PENDING;
 
+    @Column(length = 300)
+    private String message;
+
+    @Column(name = "completed_at")
+    private LocalDateTime completedAt;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -54,6 +60,6 @@ public class Exchange {
 
     public void accept()   { this.status = ExchangeStatus.ACCEPTED; }
     public void reject()   { this.status = ExchangeStatus.REJECTED; }
-    public void complete() { this.status = ExchangeStatus.COMPLETED; }
+    public void complete() { this.status = ExchangeStatus.COMPLETED; this.completedAt = LocalDateTime.now(); }
     public void cancel()   { this.status = ExchangeStatus.CANCELLED; }
 }
