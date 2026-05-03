@@ -12,8 +12,6 @@ import PMBookCover from '../components/ui/PMBookCover';
 import { profileApi } from '../features/profile/api';
 import { Profile } from '../features/profile/types';
 import { BookSummary } from '../features/books/types';
-import { readingApi } from '../features/reading/api';
-import { ReadingRecord } from '../features/reading/types';
 import { authApi } from '../features/auth/api';
 import { useAuthStore } from '../store';
 
@@ -29,16 +27,6 @@ const statusVariant = (s: string): BadgeVariant => {
 const STATUS_LABEL: Record<string, string> = {
   AVAILABLE: '교환가능', IN_PROGRESS: '교환중', COMPLETED: '교환완료',
 };
-
-/* ---------- Stars ---------- */
-const Stars: React.FC<{ value: number }> = ({ value }) => (
-  <View style={styles.starsRow}>
-    {[1, 2, 3, 4, 5].map((i) => (
-      <PMIcon key={i} name="star" size={12}
-        color={i <= value ? colors.secondary : colors.borderStrong} strokeWidth={1.6} />
-    ))}
-  </View>
-);
 
 /* ---------- TopBar ---------- */
 const TopBar: React.FC = () => (
@@ -161,29 +149,6 @@ const AddBookTile: React.FC = () => (
   </TouchableOpacity>
 );
 
-/* ---------- ReadItem ---------- */
-interface ReadItemProps { record: ReadingRecord; isLast: boolean }
-
-const ReadItem: React.FC<ReadItemProps> = ({ record, isLast }) => {
-  const date = record.readAt
-    ? new Date(record.readAt).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })
-    : '';
-  return (
-    <View style={[styles.readItem, !isLast && styles.readItemBorder]}>
-      <PMBookCover title={record.bookTitle} author={record.author}
-        color={(record.coverColor ?? 'sage') as any} width={40} height={58} />
-      <View style={styles.readItemMeta}>
-        <Text style={styles.readItemTitle} numberOfLines={1}>{record.bookTitle}</Text>
-        <Text style={styles.readItemAuthor}>{record.author}</Text>
-        <View style={styles.readItemBottom}>
-          <Stars value={record.rating} />
-          <Text style={styles.readItemDate}>{date}</Text>
-        </View>
-      </View>
-    </View>
-  );
-};
-
 /* ---------- SettingsItem ---------- */
 interface SettingsItemProps {
   icon: React.ReactNode; title: string; subtitle?: string;
@@ -217,19 +182,16 @@ const ProfileScreen: React.FC = () => {
     router.replace('/(auth)/login');
   };
   const [books, setBooks] = useState<BookSummary[]>([]);
-  const [readingRecords, setReadingRecords] = useState<ReadingRecord[]>([]);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     try {
-      const [p, b, r] = await Promise.all([
+      const [p, b] = await Promise.all([
         profileApi.getMyProfile(),
         profileApi.getMyBooks(0, 10).catch(() => ({ content: [] as BookSummary[] })),
-        readingApi.getMyRecords(0, 3).catch(() => ({ content: [] as ReadingRecord[] })),
       ]);
       setProfile(p);
       setBooks(b.content);
-      setReadingRecords(r.content);
     } catch {
       // 비로그인 상태면 무시
     } finally {
@@ -259,20 +221,6 @@ const ProfileScreen: React.FC = () => {
               <AddBookTile />
               {books.map((b) => <MyBookCard key={b.id} book={b} />)}
             </ScrollView>
-
-            <SectionHeader title="독서 기록" action="기록 추가"
-              onAction={() => router.push('/reading/new')} />
-            {readingRecords.length > 0 ? (
-              <View style={styles.card}>
-                {readingRecords.map((r, i) => (
-                  <ReadItem key={r.id} record={r} isLast={i === readingRecords.length - 1} />
-                ))}
-              </View>
-            ) : (
-              <View style={[styles.card, { alignItems: 'center', padding: 24 }]}>
-                <Text style={{ fontSize: 13, color: colors.textTertiary }}>아직 독서 기록이 없어요</Text>
-              </View>
-            )}
 
             <SectionHeader title="설정" />
             <View style={[styles.card, styles.settingsCard]}>
@@ -360,22 +308,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center',
   },
   addTileText: { fontSize: 11, fontWeight: '600', color: colors.primary, textAlign: 'center', lineHeight: 16 },
-  starsRow: { flexDirection: 'row', gap: 1 },
   card: {
     marginHorizontal: spacing.s4, marginBottom: spacing.s6,
     backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
     borderRadius: radius.lg, overflow: 'hidden',
   },
-  readItem: { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 12, paddingHorizontal: 18 },
-  readItemBorder: { borderBottomWidth: 1, borderBottomColor: colors.border },
-  readItemMeta: { flex: 1, minWidth: 0 },
-  readItemTitle: { fontSize: 13, fontWeight: '700', color: colors.text, letterSpacing: -0.2, lineHeight: 17 },
-  readItemAuthor: { fontSize: 11, color: colors.textSecondary, marginTop: 2 },
-  readItemBottom: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 5 },
-  readItemDate: { fontSize: 10, color: colors.textTertiary },
-  readMoreDivider: { borderTopWidth: 1, borderTopColor: colors.border },
-  readMoreBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, padding: 12 },
-  readMoreText: { fontSize: 13, fontWeight: '600', color: colors.primary },
   settingsCard: { marginBottom: spacing.s6 },
   settingsItem: { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 14, paddingHorizontal: 18 },
   settingsItemBorder: { borderBottomWidth: 1, borderBottomColor: colors.border },
