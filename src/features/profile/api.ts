@@ -34,9 +34,9 @@ export const profileApi = {
     return res.data.data;
   },
 
-  getMyBooks: async (page = 0, size = 10): Promise<BookPage> => {
+  getMyBooks: async (page = 0, size = 10, status?: string): Promise<BookPage> => {
     const res = await api.get<ApiResponse<BookPage>>('/v1/users/me/books', {
-      params: { page, size },
+      params: { page, size, ...(status ? { status } : {}) },
     });
     return res.data.data;
   },

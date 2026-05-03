@@ -5,7 +5,7 @@ import {
   Platform, ActivityIndicator,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { colors, spacing, radius, fontSize } from '@/theme/tokens';
 import PMIcon from '@/components/ui/PMIcon';
 import { chatApi } from '@/features/chat/api';
@@ -99,12 +99,10 @@ export default function ChatRoomScreen() {
   const router = useRouter();
   const qc = useQueryClient();
   const accessToken = useAuthStore(s => s.accessToken);
+  const myUserId = useAuthStore(s => s.user?.id) ?? null;
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const listRef = useRef<FlatList>(null);
-  const myUserId = useAuthStore(s => s.accessToken)
-    ? Number(JSON.parse(atob(accessToken!.split('.')[1])).sub)
-    : null;
 
   // 커서 기반 무한 스크롤 (id DESC → 화면에는 역순 표시)
   const {
@@ -130,31 +128,45 @@ export default function ChatRoomScreen() {
     qc.invalidateQueries({ queryKey: ['chat-rooms'] });
   }, [roomId]);
 
-  // STOMP 실시간 수신
+  // STOMP 실시간 수신 — 내가 보낸 메시지는 낙관적 항목을 실제 메시지로 교체
   const handleNewMessage = useCallback((msg: ChatMessage) => {
-    setMessages(prev => [...prev, msg]);
+    setMessages(prev => {
+      if (msg.senderId === myUserId) {
+        const optIdx = prev.map((m, i) => (m.id < 0 ? i : -1)).filter(i => i >= 0).pop();
+        if (optIdx !== undefined) {
+          const updated = [...prev];
+          updated[optIdx] = msg;
+          return updated;
+        }
+      }
+      return [...prev, msg];
+    });
     if (msg.senderId !== myUserId) {
       chatApi.markAsRead(Number(roomId)).catch(() => {});
     }
   }, [myUserId, roomId]);
 
-  const { sendMessage } = useStompChat({
+  const { sendMessage, isConnected } = useStompChat({
     roomId: Number(roomId),
     token: accessToken,
     onMessage: handleNewMessage,
-  });
-
-  const { mutate: sendRest } = useMutation({
-    mutationFn: (content: string) => chatApi.createRoom(Number(roomId)).then(() =>
-      Promise.reject('use ws')).catch(() =>
-      // WS 발신으로만 처리, REST fallback 불필요
-      Promise.resolve()),
   });
 
   const handleSend = () => {
     const text = input.trim();
     if (!text) return;
     setInput('');
+    // 낙관적 업데이트 — 전송 즉시 화면에 표시
+    const optimistic: ChatMessage = {
+      id: -Date.now(),
+      senderId: myUserId,
+      senderNickname: null,
+      content: text,
+      messageType: 'TEXT',
+      isRead: true,
+      createdAt: new Date().toISOString(),
+    };
+    setMessages(prev => [...prev, optimistic]);
     sendMessage(text);
   };
 
@@ -179,7 +191,12 @@ export default function ChatRoomScreen() {
         <TouchableOpacity style={styles.backBtn} onPress={() => router.back()} activeOpacity={0.7}>
           <PMIcon name="chevronRight" size={20} color={colors.text} strokeWidth={2} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>채팅</Text>
+        <View style={{ alignItems: 'center' }}>
+          <Text style={styles.headerTitle}>채팅</Text>
+          {!isConnected && (
+            <Text style={{ fontSize: 10, color: colors.textTertiary }}>연결 중...</Text>
+          )}
+        </View>
         <View style={{ width: 36 }} />
       </View>
 
@@ -223,10 +240,10 @@ export default function ChatRoomScreen() {
             blurOnSubmit={false}
           />
           <TouchableOpacity
-            style={[styles.sendBtn, !input.trim() && styles.sendBtnDisabled]}
+            style={[styles.sendBtn, (!input.trim() || !isConnected) && styles.sendBtnDisabled]}
             onPress={handleSend}
             activeOpacity={0.8}
-            disabled={!input.trim()}
+            disabled={!input.trim() || !isConnected}
           >
             <PMIcon name="send" size={18} color="#fff" />
           </TouchableOpacity>

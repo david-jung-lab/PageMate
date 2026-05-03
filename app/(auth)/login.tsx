@@ -97,7 +97,7 @@ export default function LoginScreen() {
 
   useEffect(() => {
     console.log('[Google OAuth] redirectUri:', googleRedirectUri);
-    console.log('[Kakao OAuth] redirectUri:', kakaoRedirectUri);
+    console.log('[Kakao OAuth] redirectUri:', kakaoNativeRedirectUri);
   }, []);
 
   // ── Google OAuth ─────────────────────────────────────────────────────────

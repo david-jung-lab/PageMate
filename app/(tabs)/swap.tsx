@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
-  View, Text, FlatList, TouchableOpacity,
-  StyleSheet, SafeAreaView, StatusBar, ActivityIndicator, Alert,
+  View, Text, FlatList, ScrollView, TouchableOpacity,
+  StyleSheet, SafeAreaView, StatusBar, ActivityIndicator, Alert, RefreshControl,
 } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
@@ -42,10 +42,17 @@ export default function SwapScreen() {
   const activeStatuses: ExchangeStatus[] = ['PENDING', 'ACCEPTED'];
   const doneStatuses: ExchangeStatus[] = ['REJECTED', 'COMPLETED', 'CANCELLED'];
 
-  const { data: activeData, isLoading: activeLoading } = useQuery({
+  const { data: activeData, isLoading: activeLoading, refetch } = useQuery({
     queryKey: ['exchanges', 'active'],
     queryFn: () => exchangeApi.getMyExchanges(undefined, 0, 50),
   });
+
+  const [refreshing, setRefreshing] = useState(false);
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await refetch();
+    setRefreshing(false);
+  };
 
   const acceptMutation = useMutation({
     mutationFn: exchangeApi.acceptExchange,
@@ -111,7 +118,13 @@ export default function SwapScreen() {
     ]);
   };
 
-  const renderExchange = ({ item }: { item: Exchange }) => (
+  const renderExchange = ({ item }: { item: Exchange }) => {
+    const isRequester = item.requester.id === myUserId;
+    const partner = isRequester ? item.respondent : item.requester;
+    const myBook = isRequester ? item.offeredBook : item.requestedBook;
+    const theirBook = isRequester ? item.requestedBook : item.offeredBook;
+
+    return (
     <View style={styles.card}>
       <View style={styles.cardHeader}>
         <PMBadge variant={STATUS_VARIANT[item.status]} size="sm">
@@ -124,30 +137,30 @@ export default function SwapScreen() {
 
       <View style={styles.booksRow}>
         <BookMini
-          title={item.offeredBook.title}
-          author={item.offeredBook.author}
-          imageUrl={item.offeredBook.imageUrl}
-          coverColor={item.offeredBook.coverColor}
+          title={myBook.title}
+          author={myBook.author}
+          imageUrl={myBook.imageUrl}
+          coverColor={myBook.coverColor}
           label="내 책"
         />
         <PMIcon name="swap" size={20} color={colors.textTertiary} />
         <BookMini
-          title={item.requestedBook.title}
-          author={item.requestedBook.author}
-          imageUrl={item.requestedBook.imageUrl}
-          coverColor={item.requestedBook.coverColor}
+          title={theirBook.title}
+          author={theirBook.author}
+          imageUrl={theirBook.imageUrl}
+          coverColor={theirBook.coverColor}
           label="상대 책"
         />
       </View>
 
       <View style={styles.partnerRow}>
         <PMAvatar
-          name={item.respondent.nickname}
-          color={item.respondent.avatarColor ?? 'blue'}
+          name={partner.nickname}
+          color={partner.avatarColor ?? 'blue'}
           size={28}
-          imageUrl={item.respondent.profileImage ?? undefined}
+          imageUrl={partner.profileImage ?? undefined}
         />
-        <Text style={styles.partnerName}>{item.respondent.nickname}</Text>
+        <Text style={styles.partnerName}>{partner.nickname}</Text>
         <Text style={styles.partnerLabel}>와(과) 교환</Text>
       </View>
 
@@ -157,7 +170,7 @@ export default function SwapScreen() {
             onAccept={() => handleAccept(item.id)}
             onReject={() => handleReject(item.id)}
             onCancel={() => handleCancel(item.id)}
-            isRespondent={item.respondent.id === myUserId}
+            isRespondent={!isRequester}
           />
         </View>
       )}
@@ -179,6 +192,7 @@ export default function SwapScreen() {
       )}
     </View>
   );
+  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -206,12 +220,17 @@ export default function SwapScreen() {
       {activeLoading ? (
         <ActivityIndicator style={{ flex: 1 }} color={colors.primary} />
       ) : displayed.length === 0 ? (
-        <View style={styles.empty}>
+        <ScrollView
+          contentContainerStyle={styles.empty}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.primary} />
+          }
+        >
           <PMIcon name="swap" size={40} color={colors.borderStrong} />
           <Text style={styles.emptyText}>
             {tab === 'active' ? '진행 중인 교환이 없어요' : '완료된 교환이 없어요'}
           </Text>
-        </View>
+        </ScrollView>
       ) : (
         <FlatList
           data={displayed}
@@ -219,6 +238,9 @@ export default function SwapScreen() {
           renderItem={renderExchange}
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.primary} />
+          }
         />
       )}
     </SafeAreaView>
