@@ -180,6 +180,14 @@ export default function BookDetailScreen() {
               </View>
             </View>
           </View>
+          <TouchableOpacity
+            style={styles.profileBtn}
+            activeOpacity={0.75}
+            onPress={() => router.push(`/users/${book.owner.id}`)}
+          >
+            <Text style={styles.profileBtnText}>프로필 보기</Text>
+            <PMIcon name="chevronRight" size={14} color={colors.text} />
+          </TouchableOpacity>
         </View>
 
         {/* 교환 요청 버튼 — 본인 책이면 숨김 */}
@@ -373,6 +381,19 @@ const styles = StyleSheet.create({
   },
 
   ownerCard: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  profileBtn: {
+    marginTop: 4,
+    height: 38,
+    backgroundColor: colors.bg,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    borderRadius: radius.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+  },
+  profileBtnText: { fontSize: 13, fontWeight: '600', color: colors.text },
   ownerInfo: { flex: 1, gap: 2 },
   ownerName: { fontSize: 15, fontWeight: '700', color: colors.text },
   ownerHandle: { fontSize: 11, color: colors.textTertiary, fontFamily: 'monospace' },

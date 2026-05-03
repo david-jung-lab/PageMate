@@ -17,6 +17,7 @@ import { makeRedirectUri, useAuthRequest, ResponseType } from 'expo-auth-session
 import { authApi } from '@/features/auth/api';
 import { useAuthStore } from '@/store/index';
 import {
+  API_BASE_URL,
   GOOGLE_WEB_CLIENT_ID,
   KAKAO_REST_API_KEY,
 } from '@/constants/index';
@@ -96,7 +97,7 @@ export default function LoginScreen() {
 
   useEffect(() => {
     console.log('[Google OAuth] redirectUri:', googleRedirectUri);
-    console.log('[Kakao OAuth] redirectUri:', kakaoRedirectUri);
+    console.log('[Kakao OAuth] redirectUri:', kakaoNativeRedirectUri);
   }, []);
 
   // ── Google OAuth ─────────────────────────────────────────────────────────
@@ -126,12 +127,15 @@ export default function LoginScreen() {
   }, [googleResponse]);
 
   // ── Kakao OAuth ──────────────────────────────────────────────────────────
-  const kakaoRedirectUri = makeRedirectUri({ scheme: 'pagemate', path: 'oauth' });
+  // native: 백엔드 callback 경유 (카카오가 custom scheme URI 등록 불가)
+  // web: 기존 expo-auth-session 방식
+  const kakaoNativeRedirectUri = `${API_BASE_URL}/v1/auth/oauth/kakao/callback`;
+  const kakaoWebRedirectUri = makeRedirectUri({ scheme: 'pagemate', path: 'oauth' });
 
   const [, kakaoResponse, kakaoPromptAsync] = useAuthRequest(
     {
       clientId: KAKAO_REST_API_KEY,
-      redirectUri: kakaoRedirectUri,
+      redirectUri: kakaoWebRedirectUri,
       responseType: ResponseType.Code,
       usePKCE: false,
     },
@@ -145,8 +149,7 @@ export default function LoginScreen() {
     console.log('[Kakao OAuth] response:', JSON.stringify(kakaoResponse));
     if (kakaoResponse.type === 'success') {
       const code = kakaoResponse.params.code;
-      console.log('[Kakao OAuth] code:', code, 'redirectUri:', kakaoRedirectUri);
-      handleOAuthCallback('kakao', code, kakaoRedirectUri);
+      handleOAuthCallback('kakao', code, kakaoWebRedirectUri);
     } else {
       setLoading(null);
     }
@@ -190,6 +193,32 @@ export default function LoginScreen() {
 
   const handleKakao = async () => {
     setLoading('kakao');
+
+    if (Platform.OS !== 'web') {
+      try {
+        const authUrl =
+          `https://kauth.kakao.com/oauth/authorize` +
+          `?client_id=${KAKAO_REST_API_KEY}` +
+          `&redirect_uri=${encodeURIComponent(kakaoNativeRedirectUri)}` +
+          `&response_type=code`;
+        const result = await WebBrowser.openAuthSessionAsync(authUrl, 'pagemate://');
+        if (result.type === 'success') {
+          const match = result.url.match(/[?&]code=([^&]+)/);
+          const code = match ? decodeURIComponent(match[1]) : null;
+          if (code) {
+            await handleOAuthCallback('kakao', code, kakaoNativeRedirectUri);
+          } else {
+            setLoading(null);
+          }
+        } else {
+          setLoading(null);
+        }
+      } catch {
+        setLoading(null);
+      }
+      return;
+    }
+
     await kakaoPromptAsync();
   };
 

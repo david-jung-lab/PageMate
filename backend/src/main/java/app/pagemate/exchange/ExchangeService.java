@@ -117,7 +117,6 @@ public class ExchangeService {
                             .sender(null)
                             .content("교환이 수락되었어요. 만남 장소를 정해보세요!")
                             .messageType(MessageType.SYSTEM)
-                            .isRead(true)
                             .build());
                     newRoom.updateLastMessage(sysMsg.getContent());
                     return newRoom;
