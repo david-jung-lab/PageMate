@@ -93,6 +93,7 @@ public class AuthService {
 
     @Transactional
     public void logout(Long userId) {
+        if (userId == null) return;
         userRepository.findById(userId).ifPresent(User::clearRefreshToken);
     }
 
