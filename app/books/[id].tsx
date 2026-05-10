@@ -13,7 +13,8 @@ import PMBadge from '../../src/components/ui/PMBadge';
 import PMAvatar from '../../src/components/ui/PMAvatar';
 import { booksApi } from '../../src/features/books/api';
 import { exchangeApi } from '../../src/features/exchange/api';
-import { STATUS_LABELS } from '../../src/constants';
+import { STATUS_LABELS, GENRE_LABELS } from '../../src/constants';
+import Svg, { Path } from 'react-native-svg';
 
 const statusVariant = (s: string) => {
   if (s === 'AVAILABLE') return 'success' as const;
@@ -112,7 +113,7 @@ export default function BookDetailScreen() {
               <PMBadge variant={statusVariant(book.status)} size="sm">
                 {STATUS_LABELS[book.status]}
               </PMBadge>
-              <PMBadge variant="default" size="sm">{book.genre}</PMBadge>
+              <PMBadge variant="default" size="sm">{GENRE_LABELS[book.genre] ?? book.genre}</PMBadge>
             </View>
             <Text style={styles.title}>{book.title}</Text>
             <Text style={styles.author}>{book.author}</Text>
@@ -143,9 +144,18 @@ export default function BookDetailScreen() {
             <PMAvatar name={book.owner.nickname} color="blue" size={48} />
             <View style={styles.ownerInfo}>
               <Text style={styles.ownerName}>{book.owner.nickname}</Text>
-              {book.owner.handle && (
-                <Text style={styles.ownerHandle}>{book.owner.handle}</Text>
-              )}
+              <View style={styles.ownerRatingRow}>
+                <Svg width={13} height={13} viewBox="0 0 24 24">
+                  <Path
+                    d="m12 2 3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z"
+                    fill="#F4A261" stroke="#F4A261" strokeWidth="1" strokeLinejoin="round"
+                  />
+                </Svg>
+                <Text style={styles.ownerRating}>
+                  {book.owner.averageRating.toFixed(1)}
+                </Text>
+                <Text style={styles.ownerRatingCount}>({book.owner.reviewCount})</Text>
+              </View>
               <View style={styles.ownerStats}>
                 <Text style={styles.ownerStat}>등록 {book.owner.bookCount}권</Text>
                 <Text style={styles.ownerStatDot}>·</Text>
@@ -292,7 +302,9 @@ const styles = StyleSheet.create({
   profileBtnText: { fontSize: 13, fontWeight: '600', color: colors.text },
   ownerInfo: { flex: 1, gap: 2 },
   ownerName: { fontSize: 15, fontWeight: '700', color: colors.text },
-  ownerHandle: { fontSize: 11, color: colors.textTertiary, fontFamily: 'monospace' },
+  ownerRatingRow: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 2 },
+  ownerRating: { fontSize: 13, fontWeight: '700', color: colors.text },
+  ownerRatingCount: { fontSize: 12, color: colors.textTertiary },
   ownerStats: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
   ownerStat: { fontSize: 12, color: colors.textSecondary },
   ownerStatDot: { fontSize: 12, color: colors.textTertiary },

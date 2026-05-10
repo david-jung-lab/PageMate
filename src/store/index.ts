@@ -5,6 +5,7 @@ import type { AuthUser } from '@/features/auth/types';
 interface AuthState {
   accessToken: string | null;
   isAuthenticated: boolean;
+  isHydrated: boolean;
   user: AuthUser | null;
   setAuth: (accessToken: string, refreshToken: string, user: AuthUser) => Promise<void>;
   updateAccessToken: (accessToken: string) => Promise<void>;
@@ -15,6 +16,7 @@ interface AuthState {
 export const useAuthStore = create<AuthState>((set) => ({
   accessToken: null,
   isAuthenticated: false,
+  isHydrated: false,
   user: null,
 
   setAuth: async (accessToken, refreshToken, user) => {
@@ -38,7 +40,9 @@ export const useAuthStore = create<AuthState>((set) => ({
   hydrate: async () => {
     const accessToken = await storage.getAccessToken();
     if (accessToken) {
-      set({ accessToken, isAuthenticated: true });
+      set({ accessToken, isAuthenticated: true, isHydrated: true });
+    } else {
+      set({ isHydrated: true });
     }
   },
 }));

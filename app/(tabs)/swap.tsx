@@ -274,7 +274,7 @@ export default function SwapScreen() {
       </Modal>
 
       <View style={styles.topBar}>
-        <Text style={styles.title}>교환</Text>
+        <Text style={styles.title}>교환독서</Text>
       </View>
 
       <View style={styles.tabRow}>

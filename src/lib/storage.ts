@@ -28,6 +28,8 @@ const remove = (key: string): Promise<void> => {
   return SecureStore.deleteItemAsync(key);
 };
 
+const GENRE_PENDING_KEY = 'pm_genre_pending';
+
 export const storage = {
   getAccessToken: () => get(ACCESS_KEY),
   setAccessToken: (token: string) => set(ACCESS_KEY, token),
@@ -37,4 +39,7 @@ export const storage = {
     await remove(ACCESS_KEY);
     await remove(REFRESH_KEY);
   },
+  getGenrePending: () => get(GENRE_PENDING_KEY),
+  setGenrePending: () => set(GENRE_PENDING_KEY, 'true'),
+  clearGenrePending: () => remove(GENRE_PENDING_KEY),
 };

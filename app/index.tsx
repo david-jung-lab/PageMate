@@ -46,71 +46,65 @@ export default function SplashScreen() {
     let mounted = true;
     let anim: Animated.CompositeAnimation | null = null;
 
-    (async () => {
-      const token = await storage.getAccessToken();
-      if (!mounted) return;
+    const tokenPromise = storage.getAccessToken();
 
-      if (!token) {
-        router.replace('/(auth)/login');
-        return;
-      }
-
-      anim = Animated.sequence([
-        // ① "Pm." fade in
-        Animated.timing(logoOpacity, {
-          toValue: 1, duration: FADE_IN,
-          easing: EASE_OUT, useNativeDriver: true,
+    anim = Animated.sequence([
+      // ① "Pm." fade in
+      Animated.timing(logoOpacity, {
+        toValue: 1, duration: FADE_IN,
+        easing: EASE_OUT, useNativeDriver: true,
+      }),
+      // ② Hold
+      Animated.delay(HOLD_PM),
+      // ③ Expand → "PageMate."
+      Animated.parallel([
+        Animated.timing(logoScale, {
+          toValue: 1, duration: EXPAND,
+          easing: EASE_IN_OUT, useNativeDriver: true,
         }),
-        // ② Hold
-        Animated.delay(HOLD_PM),
-        // ③ Expand → "PageMate."
-        Animated.parallel([
-          Animated.timing(logoScale, {
-            toValue: 1, duration: EXPAND,
-            easing: EASE_IN_OUT, useNativeDriver: true,
-          }),
-          Animated.timing(ageWidth, {
-            toValue: AGE_W, duration: EXPAND,
-            easing: EASE_IN_OUT, useNativeDriver: false,
-          }),
-          Animated.timing(ateWidth, {
-            toValue: ATE_W, duration: EXPAND,
-            easing: EASE_IN_OUT, useNativeDriver: false,
-          }),
-          Animated.sequence([
-            Animated.delay(120),
-            Animated.timing(ageOpacity, {
-              toValue: 1, duration: EXPAND - 120,
-              easing: EASE_OUT, useNativeDriver: true,
-            }),
-          ]),
-          Animated.sequence([
-            Animated.delay(120),
-            Animated.timing(ateOpacity, {
-              toValue: 1, duration: EXPAND - 120,
-              easing: EASE_OUT, useNativeDriver: true,
-            }),
-          ]),
-        ]),
-        // ④ Hold "PageMate."
-        Animated.delay(HOLD_FULL),
-        // ⑤ Fade out logo + bg transition
-        Animated.parallel([
-          Animated.timing(bgAnim, {
-            toValue: 1, duration: FADE_OUT,
-            easing: EASE_IN_OUT, useNativeDriver: false,
-          }),
-          Animated.timing(logoOpacity, {
-            toValue: 0, duration: FADE_OUT,
+        Animated.timing(ageWidth, {
+          toValue: AGE_W, duration: EXPAND,
+          easing: EASE_IN_OUT, useNativeDriver: false,
+        }),
+        Animated.timing(ateWidth, {
+          toValue: ATE_W, duration: EXPAND,
+          easing: EASE_IN_OUT, useNativeDriver: false,
+        }),
+        Animated.sequence([
+          Animated.delay(120),
+          Animated.timing(ageOpacity, {
+            toValue: 1, duration: EXPAND - 120,
             easing: EASE_OUT, useNativeDriver: true,
           }),
         ]),
-      ]);
+        Animated.sequence([
+          Animated.delay(120),
+          Animated.timing(ateOpacity, {
+            toValue: 1, duration: EXPAND - 120,
+            easing: EASE_OUT, useNativeDriver: true,
+          }),
+        ]),
+      ]),
+      // ④ Hold "PageMate."
+      Animated.delay(HOLD_FULL),
+      // ⑤ Fade out logo + bg transition
+      Animated.parallel([
+        Animated.timing(bgAnim, {
+          toValue: 1, duration: FADE_OUT,
+          easing: EASE_IN_OUT, useNativeDriver: false,
+        }),
+        Animated.timing(logoOpacity, {
+          toValue: 0, duration: FADE_OUT,
+          easing: EASE_OUT, useNativeDriver: true,
+        }),
+      ]),
+    ]);
 
-      anim.start(({ finished }) => {
-        if (finished && mounted) router.replace('/(tabs)');
-      });
-    })();
+    anim.start(async ({ finished }) => {
+      if (!finished || !mounted) return;
+      const token = await tokenPromise;
+      router.replace(token ? '/(tabs)' : '/(auth)/login');
+    });
 
     return () => {
       mounted = false;

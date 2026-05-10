@@ -8,6 +8,9 @@ export interface Profile {
   location: string | null;
   tags: string[];
   bookCount: number;
+  exchangeCount: number;
+  averageRating: number;
+  reviewCount: number;
   createdAt: string;
 }
 

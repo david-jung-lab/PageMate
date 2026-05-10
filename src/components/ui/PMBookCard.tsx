@@ -86,9 +86,11 @@ const PMBookCard: React.FC<PMBookCardProps> = ({ book, onPress }) => {
         <Text style={styles.title} numberOfLines={1}>{book.title}</Text>
         <Text style={styles.author} numberOfLines={1}>{book.author}</Text>
         <View style={styles.locRow}>
-          <PinIcon />
-          <Text style={styles.locText}>
-            {book.neighborhood ?? '위치 미설정'} · {book.owner.nickname}
+          <View style={{ flexShrink: 0 }}>
+            <PinIcon />
+          </View>
+          <Text style={styles.locText} numberOfLines={1}>
+            {(book.neighborhood ?? '위치 미설정').split(' · ')[0]} · {book.owner.nickname}
           </Text>
         </View>
       </View>

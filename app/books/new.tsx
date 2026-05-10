@@ -1,7 +1,8 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View, Text, TextInput, ScrollView, TouchableOpacity, Image,
   StyleSheet, SafeAreaView, StatusBar, ActivityIndicator, Alert,
+  Modal, KeyboardAvoidingView, Platform, Pressable,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useQuery, useMutation } from '@tanstack/react-query';
@@ -11,11 +12,123 @@ import PMBookCover from '../../src/components/ui/PMBookCover';
 import { booksApi } from '../../src/features/books/api';
 import { CoverColor, KakaoBookItem } from '../../src/features/books/types';
 import { locationApi, LocationResult } from '../../src/features/locations/api';
+import { profileApi } from '../../src/features/profile/api';
 import { GENRES } from '../../src/constants';
 import { bookCoverPalettes } from '../../src/theme/tokens';
 
 const COVER_COLORS = Object.keys(bookCoverPalettes) as CoverColor[];
 
+/* ---------- NeighborhoodSheet ---------- */
+const NeighborhoodSheet: React.FC<{
+  visible: boolean;
+  onClose: () => void;
+  onSelect: (location: string) => void;
+}> = ({ visible, onClose, onSelect }) => {
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState<LocationResult[]>([]);
+  const [searching, setSearching] = useState(false);
+  const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (!query.trim()) { setResults([]); return; }
+    if (debounce.current) clearTimeout(debounce.current);
+    debounce.current = setTimeout(async () => {
+      setSearching(true);
+      try { setResults((await locationApi.search(query.trim())) ?? []); }
+      catch { setResults([]); }
+      finally { setSearching(false); }
+    }, 350);
+    return () => { if (debounce.current) clearTimeout(debounce.current); };
+  }, [query]);
+
+  const handlePick = async (r: LocationResult) => {
+    const displayLabel = r.district ? `${r.name} · ${r.district}` : r.name;
+    try { await profileApi.updateMyProfile({ location: displayLabel }); } catch { /* 무시 */ }
+    onSelect(r.name); // 책 neighborhood에는 동 이름만 저장
+    setQuery('');
+    setResults([]);
+  };
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <Pressable style={sheetStyles.overlay} onPress={onClose} />
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <View style={sheetStyles.sheet}>
+          <View style={sheetStyles.handle} />
+          <Text style={sheetStyles.title}>교환 위치 설정</Text>
+          <Text style={sheetStyles.subtitle}>책을 교환할 동네를 검색해주세요</Text>
+          <View style={sheetStyles.searchRow}>
+            <PMIcon name="search" size={18} color={colors.textTertiary} />
+            <TextInput
+              style={sheetStyles.searchInput}
+              value={query}
+              onChangeText={setQuery}
+              placeholder="동 이름으로 검색 (예: 망원동)"
+              placeholderTextColor={colors.textTertiary}
+              autoFocus
+              autoCorrect={false}
+            />
+            {searching && <ActivityIndicator size="small" color={colors.primary} />}
+          </View>
+          {results.length > 0 && (
+            <View style={sheetStyles.resultList}>
+              {results.map((r, i) => (
+                <TouchableOpacity
+                  key={`${r.fullAddress}-${i}`}
+                  style={[sheetStyles.resultItem, i > 0 && sheetStyles.resultBorder]}
+                  onPress={() => handlePick(r)}
+                  activeOpacity={0.75}
+                >
+                  <PMIcon name="location" size={14} color={colors.primary} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={sheetStyles.resultName}>{r.name}</Text>
+                    {r.district && <Text style={sheetStyles.resultSub}>{r.district} · {r.city}</Text>}
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+          {!searching && query.trim().length > 0 && results.length === 0 && (
+            <Text style={sheetStyles.empty}>검색 결과가 없어요</Text>
+          )}
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+};
+
+const sheetStyles = StyleSheet.create({
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' },
+  sheet: {
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 24,
+    paddingTop: 12,
+    paddingBottom: Platform.OS === 'ios' ? 40 : 24,
+    gap: 12,
+  },
+  handle: { width: 40, height: 4, backgroundColor: colors.border, borderRadius: 2, alignSelf: 'center', marginBottom: 4 },
+  title: { fontSize: 18, fontWeight: '700', color: colors.text, letterSpacing: -0.3 },
+  subtitle: { fontSize: 13, color: colors.textSecondary, marginTop: -4 },
+  searchRow: {
+    height: 48, paddingHorizontal: 14, backgroundColor: colors.bg,
+    borderWidth: 1.5, borderColor: colors.border, borderRadius: radius.lg,
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+  },
+  searchInput: { flex: 1, fontSize: 14, color: colors.text, padding: 0 },
+  resultList: {
+    backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
+    borderRadius: radius.lg, overflow: 'hidden',
+  },
+  resultItem: { height: 56, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  resultBorder: { borderTopWidth: 1, borderTopColor: colors.border },
+  resultName: { fontSize: 14, fontWeight: '600', color: colors.text },
+  resultSub: { fontSize: 12, color: colors.textTertiary, marginTop: 1 },
+  empty: { fontSize: 13, color: colors.textTertiary, textAlign: 'center', paddingVertical: 12 },
+});
+
+/* ---------- NewBookScreen ---------- */
 export default function NewBookScreen() {
   const router = useRouter();
 
@@ -30,11 +143,24 @@ export default function NewBookScreen() {
   const [description, setDescription] = useState('');
   const [coverColor, setCoverColor] = useState<CoverColor>('sage');
 
+  const [selectedNeighborhood, setSelectedNeighborhood] = useState('');
   const [neighborhoodQuery, setNeighborhoodQuery] = useState('');
   const [neighborhoodResults, setNeighborhoodResults] = useState<LocationResult[]>([]);
   const [neighborhoodSearching, setNeighborhoodSearching] = useState(false);
-  const [selectedNeighborhood, setSelectedNeighborhood] = useState('');
+  const [sheetVisible, setSheetVisible] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // 프로필에서 동네 불러오기
+  useEffect(() => {
+    profileApi.getMyProfile().then((p) => {
+      if (p.location) {
+        setSelectedNeighborhood(p.location);
+        setNeighborhoodQuery(p.location);
+      } else {
+        setSheetVisible(true);
+      }
+    }).catch(() => {});
+  }, []);
 
   const { data: kakaoResults, isLoading: kakaoLoading, refetch } = useQuery({
     queryKey: ['kakao-search', searchQuery],
@@ -74,21 +200,13 @@ export default function NewBookScreen() {
 
   const handleNeighborhoodChange = (text: string) => {
     setNeighborhoodQuery(text);
-    if (!text.trim()) {
-      setNeighborhoodResults([]);
-      return;
-    }
+    if (!text.trim()) { setNeighborhoodResults([]); return; }
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(async () => {
       setNeighborhoodSearching(true);
-      try {
-        const results = await locationApi.search(text);
-        setNeighborhoodResults(results);
-      } catch {
-        setNeighborhoodResults([]);
-      } finally {
-        setNeighborhoodSearching(false);
-      }
+      try { setNeighborhoodResults(await locationApi.search(text)); }
+      catch { setNeighborhoodResults([]); }
+      finally { setNeighborhoodSearching(false); }
     }, 350);
   };
 
@@ -139,11 +257,7 @@ export default function NewBookScreen() {
                 onSubmitEditing={() => refetch()}
               />
             </View>
-            <TouchableOpacity
-              style={styles.searchBtn}
-              onPress={() => refetch()}
-              activeOpacity={0.85}
-            >
+            <TouchableOpacity style={styles.searchBtn} onPress={() => refetch()} activeOpacity={0.85}>
               {kakaoLoading
                 ? <ActivityIndicator size="small" color="#fff" />
                 : <Text style={styles.searchBtnText}>검색</Text>}
@@ -181,82 +295,74 @@ export default function NewBookScreen() {
         {/* 기본 정보 */}
         <View style={styles.section}>
           <Text style={styles.label}>제목 *</Text>
-          <TextInput
-            style={styles.textInput}
-            value={title}
-            onChangeText={setTitle}
-            placeholder="책 제목"
-            placeholderTextColor={colors.textTertiary}
-          />
+          <TextInput style={styles.textInput} value={title} onChangeText={setTitle}
+            placeholder="책 제목" placeholderTextColor={colors.textTertiary} />
 
           <Text style={[styles.label, { marginTop: 16 }]}>저자 *</Text>
-          <TextInput
-            style={styles.textInput}
-            value={author}
-            onChangeText={setAuthor}
-            placeholder="저자명"
-            placeholderTextColor={colors.textTertiary}
-          />
+          <TextInput style={styles.textInput} value={author} onChangeText={setAuthor}
+            placeholder="저자명" placeholderTextColor={colors.textTertiary} />
 
           <Text style={[styles.label, { marginTop: 16 }]}>출판사</Text>
-          <TextInput
-            style={styles.textInput}
-            value={publisher}
-            onChangeText={setPublisher}
-            placeholder="출판사 (선택)"
-            placeholderTextColor={colors.textTertiary}
-          />
+          <TextInput style={styles.textInput} value={publisher} onChangeText={setPublisher}
+            placeholder="출판사 (선택)" placeholderTextColor={colors.textTertiary} />
         </View>
 
         {/* 동네 설정 */}
         <View style={styles.section}>
-          <Text style={styles.label}>교환 위치 (동네)</Text>
-          <View style={styles.neighborhoodInputWrap}>
-            <PMIcon name="location" size={16} color={colors.textTertiary} />
-            <TextInput
-              style={styles.input}
-              placeholder="동 이름으로 검색 (예: 망원동)"
-              placeholderTextColor={colors.textTertiary}
-              value={neighborhoodQuery}
-              onChangeText={handleNeighborhoodChange}
-              returnKeyType="search"
-            />
-            {neighborhoodSearching && <ActivityIndicator size="small" color={colors.primary} />}
-            {selectedNeighborhood ? (
-              <TouchableOpacity
-                onPress={() => { setSelectedNeighborhood(''); setNeighborhoodQuery(''); }}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              >
-                <PMIcon name="close" size={14} color={colors.textTertiary} />
-              </TouchableOpacity>
-            ) : null}
+          <View style={styles.labelRow}>
+            <Text style={styles.label}>교환 위치 (동네)</Text>
+            <TouchableOpacity onPress={() => setSheetVisible(true)} activeOpacity={0.7}>
+              <Text style={styles.changeBtn}>변경</Text>
+            </TouchableOpacity>
           </View>
-
-          {neighborhoodResults.length > 0 && (
-            <View style={styles.suggestionList}>
-              {neighborhoodResults.map((r, i) => (
-                <TouchableOpacity
-                  key={i}
-                  style={[styles.suggestionItem, i > 0 && styles.suggestionBorder]}
-                  onPress={() => handleSelectNeighborhood(r)}
-                  activeOpacity={0.7}
-                >
-                  <PMIcon name="location" size={14} color={colors.primary} />
-                  <View style={styles.suggestionTexts}>
-                    <Text style={styles.suggestionName}>{r.name}</Text>
-                    <Text style={styles.suggestionSub}>{r.district} · {r.city}</Text>
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
 
           {selectedNeighborhood ? (
             <View style={styles.selectedNeighborhood}>
               <PMIcon name="location" size={13} color={colors.primary} />
-              <Text style={styles.selectedNeighborhoodText}>{selectedNeighborhood} 선택됨</Text>
+              <Text style={styles.selectedNeighborhoodText}>{selectedNeighborhood}</Text>
             </View>
-          ) : null}
+          ) : (
+            <TouchableOpacity style={styles.setLocationBtn} onPress={() => setSheetVisible(true)} activeOpacity={0.8}>
+              <PMIcon name="location" size={16} color={colors.primary} />
+              <Text style={styles.setLocationText}>동네를 설정해주세요</Text>
+            </TouchableOpacity>
+          )}
+
+          {/* 인라인 검색 (선택 후 변경용) */}
+          {!selectedNeighborhood && (
+            <>
+              <View style={[styles.neighborhoodInputWrap, { marginTop: 10 }]}>
+                <PMIcon name="search" size={16} color={colors.textTertiary} />
+                <TextInput
+                  style={styles.input}
+                  placeholder="동 이름으로 직접 검색"
+                  placeholderTextColor={colors.textTertiary}
+                  value={neighborhoodQuery}
+                  onChangeText={handleNeighborhoodChange}
+                  returnKeyType="search"
+                />
+                {neighborhoodSearching && <ActivityIndicator size="small" color={colors.primary} />}
+              </View>
+              {neighborhoodResults.length > 0 && (
+                <View style={styles.suggestionList}>
+                  {neighborhoodResults.map((r, i) => (
+                    <TouchableOpacity
+                      key={i}
+                      style={[styles.suggestionItem, i > 0 && styles.suggestionBorder]}
+                      onPress={() => handleSelectNeighborhood(r)}
+                      activeOpacity={0.7}
+                    >
+                      <PMIcon name="location" size={14} color={colors.primary} />
+                      <View style={styles.suggestionTexts}>
+                        <Text style={styles.suggestionName}>{r.name}</Text>
+                        <Text style={styles.suggestionSub}>{r.district} · {r.city}</Text>
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+            </>
+          )}
         </View>
 
         {/* 장르 */}
@@ -265,12 +371,12 @@ export default function NewBookScreen() {
           <View style={styles.chipGrid}>
             {GENRES.map((g) => (
               <TouchableOpacity
-                key={g}
-                style={[styles.chip, genre === g && styles.chipActive]}
-                onPress={() => setGenre(g)}
+                key={g.id}
+                style={[styles.chip, genre === g.id && styles.chipActive]}
+                onPress={() => setGenre(g.id)}
                 activeOpacity={0.75}
               >
-                <Text style={[styles.chipText, genre === g && styles.chipTextActive]}>{g}</Text>
+                <Text style={[styles.chipText, genre === g.id && styles.chipTextActive]}>{g.label}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -322,6 +428,16 @@ export default function NewBookScreen() {
             : <Text style={styles.submitBtnText}>등록하기</Text>}
         </TouchableOpacity>
       </ScrollView>
+
+      <NeighborhoodSheet
+        visible={sheetVisible}
+        onClose={() => setSheetVisible(false)}
+        onSelect={(loc) => {
+          setSelectedNeighborhood(loc);
+          setNeighborhoodQuery(loc);
+          setSheetVisible(false);
+        }}
+      />
     </SafeAreaView>
   );
 }
@@ -356,41 +472,26 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     padding: 16,
   },
-  label: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: colors.text,
-    marginBottom: 10,
-    letterSpacing: -0.2,
-  },
+  labelRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
+  label: { fontSize: 13, fontWeight: '700', color: colors.text, letterSpacing: -0.2 },
+  changeBtn: { fontSize: 13, fontWeight: '600', color: colors.primary },
 
   searchRow: { flexDirection: 'row', gap: 8 },
   searchInput: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: colors.surface2,
-    borderRadius: radius.md,
-    paddingHorizontal: 12,
-    height: 40,
-    borderWidth: 1,
-    borderColor: colors.border,
+    flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: colors.surface2, borderRadius: radius.md,
+    paddingHorizontal: 12, height: 40,
+    borderWidth: 1, borderColor: colors.border,
   },
   input: { flex: 1, fontSize: 14, color: colors.text },
   searchBtn: {
-    backgroundColor: colors.primary,
-    borderRadius: radius.md,
-    paddingHorizontal: 16,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: colors.primary, borderRadius: radius.md,
+    paddingHorizontal: 16, height: 40,
+    alignItems: 'center', justifyContent: 'center',
   },
   searchBtnText: { fontSize: 13, fontWeight: '700', color: '#fff' },
 
-  kakaoThumb: {
-    width: 40, height: 58, borderRadius: 4, flexShrink: 0, backgroundColor: colors.border,
-  },
+  kakaoThumb: { width: 40, height: 58, borderRadius: 4, flexShrink: 0, backgroundColor: colors.border },
   previewImg: { width: 100, height: 144, borderRadius: 8 },
   kakaoItem: {
     flexDirection: 'row', gap: 12, alignItems: 'center',
@@ -403,70 +504,52 @@ const styles = StyleSheet.create({
 
   previewSection: { alignItems: 'center', paddingVertical: 20 },
 
+  setLocationBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    height: 44, paddingHorizontal: 14,
+    backgroundColor: colors.primarySoft, borderRadius: radius.md,
+  },
+  setLocationText: { fontSize: 14, fontWeight: '600', color: colors.primary },
+
+  selectedNeighborhood: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingHorizontal: 12, paddingVertical: 10,
+    backgroundColor: colors.primarySoft, borderRadius: radius.md,
+  },
+  selectedNeighborhoodText: { fontSize: 14, fontWeight: '600', color: colors.primary },
+
   neighborhoodInputWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: colors.surface2,
-    borderRadius: radius.md,
-    paddingHorizontal: 12,
-    height: 40,
-    borderWidth: 1,
-    borderColor: colors.border,
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: colors.surface2, borderRadius: radius.md,
+    paddingHorizontal: 12, height: 40,
+    borderWidth: 1, borderColor: colors.border,
   },
   suggestionList: {
-    marginTop: 8,
-    backgroundColor: colors.bg,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    overflow: 'hidden',
+    marginTop: 8, backgroundColor: colors.bg,
+    borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, overflow: 'hidden',
   },
   suggestionItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    backgroundColor: colors.bg,
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    paddingHorizontal: 12, paddingVertical: 10, backgroundColor: colors.bg,
   },
   suggestionBorder: { borderTopWidth: 1, borderTopColor: colors.border },
   suggestionTexts: { flex: 1 },
   suggestionName: { fontSize: 14, fontWeight: '600', color: colors.text },
   suggestionSub: { fontSize: 11, color: colors.textTertiary, marginTop: 1 },
-  selectedNeighborhood: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginTop: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    backgroundColor: colors.primarySoft,
-    borderRadius: radius.md,
-    alignSelf: 'flex-start',
-  },
-  selectedNeighborhoodText: { fontSize: 13, fontWeight: '600', color: colors.primary },
 
   textInput: {
-    backgroundColor: colors.surface2,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    fontSize: 14,
-    color: colors.text,
+    backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border,
+    borderRadius: radius.md, paddingHorizontal: 14, paddingVertical: 10,
+    fontSize: 14, color: colors.text,
   },
   textArea: { height: 80, textAlignVertical: 'top' },
   charCount: { fontSize: 11, color: colors.textTertiary, textAlign: 'right', marginTop: 6 },
 
   chipGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: {
-    height: 32, paddingHorizontal: 14,
-    borderRadius: radius.full,
+    height: 32, paddingHorizontal: 14, borderRadius: radius.full,
     alignItems: 'center', justifyContent: 'center',
-    backgroundColor: colors.surface2,
-    borderWidth: 1, borderColor: colors.border,
+    backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border,
   },
   chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   chipText: { fontSize: 13, fontWeight: '500', color: colors.textSecondary },
@@ -477,12 +560,9 @@ const styles = StyleSheet.create({
   colorDotActive: { borderWidth: 3, borderColor: colors.text },
 
   submitBtn: {
-    marginHorizontal: spacing.s4,
-    height: 52,
-    backgroundColor: colors.primary,
-    borderRadius: radius.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
+    marginHorizontal: spacing.s4, height: 52,
+    backgroundColor: colors.primary, borderRadius: radius.lg,
+    alignItems: 'center', justifyContent: 'center',
   },
   submitBtnDisabled: { backgroundColor: colors.borderStrong },
   submitBtnText: { fontSize: 15, fontWeight: '700', color: '#fff', letterSpacing: -0.2 },

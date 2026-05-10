@@ -13,7 +13,8 @@ export interface BookOwnerDetail extends BookOwner {
   tags: string[];
   bookCount: number;
   exchangeCount: number;
-  rating: number | null;
+  averageRating: number;
+  reviewCount: number;
 }
 
 export interface BookSummary {
