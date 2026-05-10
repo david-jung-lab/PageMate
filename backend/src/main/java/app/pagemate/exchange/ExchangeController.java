@@ -1,6 +1,7 @@
 package app.pagemate.exchange;
 
 import app.pagemate.common.response.ApiResponse;
+import app.pagemate.exchange.dto.CompleteRequest;
 import app.pagemate.exchange.dto.ExchangeCreateRequest;
 import app.pagemate.exchange.dto.ExchangeResponse;
 import app.pagemate.exchange.dto.RespondRequest;
@@ -61,8 +62,16 @@ public class ExchangeController {
     @PatchMapping("/{id}/complete")
     public ResponseEntity<ApiResponse<ExchangeResponse>> complete(
             @AuthenticationPrincipal Long userId,
+            @PathVariable Long id,
+            @Valid @RequestBody CompleteRequest req) {
+        return ResponseEntity.ok(ApiResponse.ok(exchangeService.completeExchange(userId, id, req)));
+    }
+
+    @PatchMapping("/{id}/complete-second")
+    public ResponseEntity<ApiResponse<ExchangeResponse>> completeSecond(
+            @AuthenticationPrincipal Long userId,
             @PathVariable Long id) {
-        return ResponseEntity.ok(ApiResponse.ok(exchangeService.completeExchange(userId, id)));
+        return ResponseEntity.ok(ApiResponse.ok(exchangeService.completeSecondExchange(userId, id)));
     }
 
     @PatchMapping("/{id}/cancel")

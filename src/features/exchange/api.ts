@@ -41,8 +41,13 @@ export const exchangeApi = {
     return res.data.data;
   },
 
-  completeExchange: async (id: number): Promise<Exchange> => {
-    const res = await api.patch<ApiResponse<Exchange>>(`/exchanges/${id}/complete`);
+  completeExchange: async (id: number, durationDays: number): Promise<Exchange> => {
+    const res = await api.patch<ApiResponse<Exchange>>(`/exchanges/${id}/complete`, { durationDays });
+    return res.data.data;
+  },
+
+  completeSecondExchange: async (id: number): Promise<Exchange> => {
+    const res = await api.patch<ApiResponse<Exchange>>(`/exchanges/${id}/complete-second`);
     return res.data.data;
   },
 

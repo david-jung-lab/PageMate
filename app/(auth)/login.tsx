@@ -230,7 +230,7 @@ export default function LoginScreen() {
       <View style={styles.hero}>
         <Wordmark />
         <View style={styles.greetingBlock}>
-          <Text style={styles.headline}>{'오늘 어떤 책을\n만나볼까요'}</Text>
+          <Text style={styles.headline}>{'책이 돌아올 때,\n더 많은 것이 담겨있다'}</Text>
           <Text style={styles.subHeadline}>PageMate에 오신 것을 환영해요</Text>
         </View>
       </View>
@@ -317,9 +317,9 @@ const styles = StyleSheet.create({
   headline: {
     fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
     fontWeight: '700',
-    fontSize: 26,
+    fontSize: 28,
     letterSpacing: -0.7,
-    lineHeight: 34,
+    lineHeight: 38,
     color: WHITE,
     textAlign: 'center',
   },

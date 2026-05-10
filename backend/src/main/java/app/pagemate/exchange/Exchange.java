@@ -7,6 +7,7 @@ import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
@@ -50,6 +51,9 @@ public class Exchange {
     @Column(name = "completed_at")
     private LocalDateTime completedAt;
 
+    @Column(name = "due_date")
+    private LocalDate dueDate;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -63,6 +67,11 @@ public class Exchange {
         this.selectedBook = selectedBook;
     }
     public void reject()   { this.status = ExchangeStatus.REJECTED; }
-    public void complete() { this.status = ExchangeStatus.COMPLETED; this.completedAt = LocalDateTime.now(); }
+    public void firstComplete(int durationDays) {
+        this.status = ExchangeStatus.FIRST_EXCHANGED;
+        this.completedAt = LocalDateTime.now();
+        this.dueDate = LocalDate.now().plusDays(durationDays);
+    }
+    public void secondComplete() { this.status = ExchangeStatus.COMPLETED; }
     public void cancel()   { this.status = ExchangeStatus.CANCELLED; }
 }

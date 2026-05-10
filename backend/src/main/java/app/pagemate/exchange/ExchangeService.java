@@ -10,6 +10,7 @@ import app.pagemate.chat.MessageRepository;
 import app.pagemate.chat.MessageType;
 import app.pagemate.common.exception.ErrorCode;
 import app.pagemate.common.exception.PagemateException;
+import app.pagemate.exchange.dto.CompleteRequest;
 import app.pagemate.exchange.dto.ExchangeCreateRequest;
 import app.pagemate.exchange.dto.ExchangeResponse;
 import app.pagemate.exchange.dto.RespondRequest;
@@ -141,7 +142,7 @@ public class ExchangeService {
     }
 
     @Transactional
-    public ExchangeResponse completeExchange(Long userId, Long exchangeId) {
+    public ExchangeResponse completeExchange(Long userId, Long exchangeId, CompleteRequest req) {
         Exchange exchange = getExchangeById(exchangeId);
         checkParticipant(userId, exchange);
 
@@ -149,7 +150,20 @@ public class ExchangeService {
             throw new PagemateException(ErrorCode.BOOK_NOT_AVAILABLE);
         }
 
-        exchange.complete();
+        exchange.firstComplete(req.getDurationDays());
+        return ExchangeResponse.of(exchange);
+    }
+
+    @Transactional
+    public ExchangeResponse completeSecondExchange(Long userId, Long exchangeId) {
+        Exchange exchange = getExchangeById(exchangeId);
+        checkParticipant(userId, exchange);
+
+        if (exchange.getStatus() != ExchangeStatus.FIRST_EXCHANGED) {
+            throw new PagemateException(ErrorCode.BOOK_NOT_AVAILABLE);
+        }
+
+        exchange.secondComplete();
         exchange.getRequestedBook().updateStatus(BookStatus.COMPLETED);
         if (exchange.getSelectedBook() != null) {
             exchange.getSelectedBook().updateStatus(BookStatus.COMPLETED);
