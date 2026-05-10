@@ -6,7 +6,6 @@ import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
@@ -40,10 +39,6 @@ public class Book {
     @Column(nullable = false, length = 50)
     private String genre;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "book_condition", nullable = false, length = 20)
-    private BookCondition condition;
-
     @Column(length = 200)
     private String description;
 
@@ -59,11 +54,8 @@ public class Book {
     @Builder.Default
     private BookStatus status = BookStatus.AVAILABLE;
 
-    @Column(precision = 10, scale = 7)
-    private BigDecimal lat;
-
-    @Column(precision = 10, scale = 7)
-    private BigDecimal lng;
+    @Column(length = 100)
+    private String neighborhood;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false, nullable = false)
@@ -77,9 +69,8 @@ public class Book {
         this.status = status;
     }
 
-    public void update(String description, BookCondition condition, String coverColor) {
+    public void update(String description, String coverColor) {
         if (description != null) this.description = description;
-        if (condition != null) this.condition = condition;
         if (coverColor != null) this.coverColor = coverColor;
     }
 }

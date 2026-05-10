@@ -4,7 +4,6 @@ import app.pagemate.auth.OAuthProvider;
 import app.pagemate.auth.client.GoogleOAuthClient;
 import app.pagemate.auth.client.KakaoOAuthClient;
 import app.pagemate.book.Book;
-import app.pagemate.book.BookCondition;
 import app.pagemate.book.BookRepository;
 import app.pagemate.common.security.JwtProvider;
 import app.pagemate.common.service.S3Service;
@@ -50,8 +49,8 @@ class ExchangeControllerTest {
     private String respondentToken;
     private Long requesterId;
     private Long respondentId;
-    private Long requestedBookId;  // respondent 소유
-    private Long offeredBookId;    // requester 소유
+    private Long targetBookId;   // respondent 소유 — requester가 원하는 책
+    private Long requesterBookId; // requester 소유 — 응답자가 선택할 책
 
     @BeforeEach
     void setUp() {
@@ -78,26 +77,24 @@ class ExchangeControllerTest {
         requesterToken = jwtProvider.createAccessToken(requesterId);
         respondentToken = jwtProvider.createAccessToken(respondentId);
 
-        Book requestedBook = bookRepository.save(Book.builder()
+        Book targetBook = bookRepository.save(Book.builder()
                 .owner(respondent)
                 .title("상대방 책")
                 .author("작가A")
                 .genre("소설")
-                .condition(BookCondition.GOOD)
                 .coverColor("blue")
                 .build());
 
-        Book offeredBook = bookRepository.save(Book.builder()
+        Book requesterBook = bookRepository.save(Book.builder()
                 .owner(requester)
-                .title("내 제안 책")
+                .title("내 책")
                 .author("작가B")
                 .genre("SF")
-                .condition(BookCondition.LIKE_NEW)
                 .coverColor("orange")
                 .build());
 
-        requestedBookId = requestedBook.getId();
-        offeredBookId = offeredBook.getId();
+        targetBookId = targetBook.getId();
+        requesterBookId = requesterBook.getId();
     }
 
     private String body(Object obj) throws Exception {
@@ -105,69 +102,59 @@ class ExchangeControllerTest {
     }
 
     @Test
-    @DisplayName("POST /v1/exchanges - 교환 요청 생성")
+    @DisplayName("POST /exchanges - 교환 요청 생성 (targetBookId만 전달)")
     void createExchange() throws Exception {
-        mockMvc.perform(post("/v1/exchanges")
+        mockMvc.perform(post("/exchanges")
                         .header("Authorization", "Bearer " + requesterToken)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(body(Map.of(
-                                "requestedBookId", requestedBookId,
-                                "offeredBookId", offeredBookId))))
+                        .content(body(Map.of("targetBookId", targetBookId))))
                 .andDo(print())
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.status").value("PENDING"))
-                .andExpect(jsonPath("$.data.requestedBook.id").value(requestedBookId))
-                .andExpect(jsonPath("$.data.offeredBook.id").value(offeredBookId));
+                .andExpect(jsonPath("$.data.requestedBook.id").value(targetBookId))
+                .andExpect(jsonPath("$.data.selectedBook").isEmpty());
     }
 
     @Test
-    @DisplayName("POST /v1/exchanges - 본인 도서에 요청 시 400")
+    @DisplayName("POST /exchanges - 본인 도서에 요청 시 400")
     void createExchange_selfExchange() throws Exception {
-        mockMvc.perform(post("/v1/exchanges")
+        mockMvc.perform(post("/exchanges")
                         .header("Authorization", "Bearer " + requesterToken)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(body(Map.of(
-                                "requestedBookId", offeredBookId,
-                                "offeredBookId", offeredBookId))))
+                        .content(body(Map.of("targetBookId", requesterBookId))))
                 .andDo(print())
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error.code").value("SELF_EXCHANGE"));
     }
 
     @Test
-    @DisplayName("POST /v1/exchanges - 중복 요청 시 409")
+    @DisplayName("POST /exchanges - 중복 요청 시 409")
     void createExchange_duplicate() throws Exception {
-        mockMvc.perform(post("/v1/exchanges")
+        mockMvc.perform(post("/exchanges")
                         .header("Authorization", "Bearer " + requesterToken)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(body(Map.of(
-                                "requestedBookId", requestedBookId,
-                                "offeredBookId", offeredBookId))))
+                        .content(body(Map.of("targetBookId", targetBookId))))
                 .andExpect(status().isOk());
 
-        mockMvc.perform(post("/v1/exchanges")
+        mockMvc.perform(post("/exchanges")
                         .header("Authorization", "Bearer " + requesterToken)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(body(Map.of(
-                                "requestedBookId", requestedBookId,
-                                "offeredBookId", offeredBookId))))
+                        .content(body(Map.of("targetBookId", targetBookId))))
                 .andDo(print())
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.error.code").value("DUPLICATE_REQUEST"));
     }
 
     @Test
-    @DisplayName("GET /v1/exchanges - 내 교환 목록 조회")
+    @DisplayName("GET /exchanges - 내 교환 목록 조회")
     void getMyExchanges() throws Exception {
-        mockMvc.perform(post("/v1/exchanges")
+        mockMvc.perform(post("/exchanges")
                         .header("Authorization", "Bearer " + requesterToken)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(body(Map.of(
-                                "requestedBookId", requestedBookId,
-                                "offeredBookId", offeredBookId))))
+                        .content(body(Map.of("targetBookId", targetBookId))))
                 .andExpect(status().isOk());
 
-        mockMvc.perform(get("/v1/exchanges")
+        mockMvc.perform(get("/exchanges")
                         .header("Authorization", "Bearer " + requesterToken))
                 .andDo(print())
                 .andExpect(status().isOk())
@@ -176,107 +163,148 @@ class ExchangeControllerTest {
     }
 
     @Test
-    @DisplayName("PATCH /v1/exchanges/{id}/accept - 응답자가 수락")
-    void acceptExchange() throws Exception {
-        String createResult = mockMvc.perform(post("/v1/exchanges")
+    @DisplayName("GET /exchanges/{id}/requester-books - 응답자가 요청자 보유 책 목록 조회")
+    void getRequesterBooks() throws Exception {
+        String createResult = mockMvc.perform(post("/exchanges")
                         .header("Authorization", "Bearer " + requesterToken)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(body(Map.of(
-                                "requestedBookId", requestedBookId,
-                                "offeredBookId", offeredBookId))))
+                        .content(body(Map.of("targetBookId", targetBookId))))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
 
         Long exchangeId = objectMapper.readTree(createResult).path("data").path("id").asLong();
 
-        mockMvc.perform(patch("/v1/exchanges/{id}/accept", exchangeId)
+        mockMvc.perform(get("/exchanges/{id}/requester-books", exchangeId)
                         .header("Authorization", "Bearer " + respondentToken))
                 .andDo(print())
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.status").value("ACCEPTED"));
+                .andExpect(jsonPath("$.data").isArray())
+                .andExpect(jsonPath("$.data[0].id").value(requesterBookId));
     }
 
     @Test
-    @DisplayName("PATCH /v1/exchanges/{id}/accept - 요청자가 수락 시 403")
-    void acceptExchange_forbidden() throws Exception {
-        String createResult = mockMvc.perform(post("/v1/exchanges")
+    @DisplayName("GET /exchanges/{id}/requester-books - 요청자 접근 시 403")
+    void getRequesterBooks_forbidden() throws Exception {
+        String createResult = mockMvc.perform(post("/exchanges")
                         .header("Authorization", "Bearer " + requesterToken)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(body(Map.of(
-                                "requestedBookId", requestedBookId,
-                                "offeredBookId", offeredBookId))))
+                        .content(body(Map.of("targetBookId", targetBookId))))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
 
         Long exchangeId = objectMapper.readTree(createResult).path("data").path("id").asLong();
 
-        mockMvc.perform(patch("/v1/exchanges/{id}/accept", exchangeId)
+        mockMvc.perform(get("/exchanges/{id}/requester-books", exchangeId)
                         .header("Authorization", "Bearer " + requesterToken))
                 .andDo(print())
                 .andExpect(status().isForbidden());
     }
 
     @Test
-    @DisplayName("PATCH /v1/exchanges/{id}/reject - 응답자가 거절")
-    void rejectExchange() throws Exception {
-        String createResult = mockMvc.perform(post("/v1/exchanges")
+    @DisplayName("PATCH /exchanges/{id}/respond - 응답자가 책 선택 후 수락")
+    void respondAccept() throws Exception {
+        String createResult = mockMvc.perform(post("/exchanges")
                         .header("Authorization", "Bearer " + requesterToken)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(body(Map.of(
-                                "requestedBookId", requestedBookId,
-                                "offeredBookId", offeredBookId))))
+                        .content(body(Map.of("targetBookId", targetBookId))))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
 
         Long exchangeId = objectMapper.readTree(createResult).path("data").path("id").asLong();
 
-        mockMvc.perform(patch("/v1/exchanges/{id}/reject", exchangeId)
-                        .header("Authorization", "Bearer " + respondentToken))
+        mockMvc.perform(patch("/exchanges/{id}/respond", exchangeId)
+                        .header("Authorization", "Bearer " + respondentToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body(Map.of("action", "ACCEPT", "selectedBookId", requesterBookId))))
+                .andDo(print())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("ACCEPTED"))
+                .andExpect(jsonPath("$.data.selectedBook.id").value(requesterBookId))
+                .andExpect(jsonPath("$.data.chatRoomId").isNotEmpty());
+    }
+
+    @Test
+    @DisplayName("PATCH /exchanges/{id}/respond - 응답자가 거절")
+    void respondReject() throws Exception {
+        String createResult = mockMvc.perform(post("/exchanges")
+                        .header("Authorization", "Bearer " + requesterToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body(Map.of("targetBookId", targetBookId))))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        Long exchangeId = objectMapper.readTree(createResult).path("data").path("id").asLong();
+
+        mockMvc.perform(patch("/exchanges/{id}/respond", exchangeId)
+                        .header("Authorization", "Bearer " + respondentToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body(Map.of("action", "REJECT"))))
                 .andDo(print())
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.status").value("REJECTED"));
     }
 
     @Test
-    @DisplayName("PATCH /v1/exchanges/{id}/complete - 수락 후 완료")
-    void completeExchange() throws Exception {
-        String createResult = mockMvc.perform(post("/v1/exchanges")
+    @DisplayName("PATCH /exchanges/{id}/respond - 요청자가 수락 시도 시 403")
+    void respondAccept_forbidden() throws Exception {
+        String createResult = mockMvc.perform(post("/exchanges")
                         .header("Authorization", "Bearer " + requesterToken)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(body(Map.of(
-                                "requestedBookId", requestedBookId,
-                                "offeredBookId", offeredBookId))))
+                        .content(body(Map.of("targetBookId", targetBookId))))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
 
         Long exchangeId = objectMapper.readTree(createResult).path("data").path("id").asLong();
 
-        mockMvc.perform(patch("/v1/exchanges/{id}/accept", exchangeId)
-                        .header("Authorization", "Bearer " + respondentToken))
-                .andExpect(status().isOk());
-
-        mockMvc.perform(patch("/v1/exchanges/{id}/complete", exchangeId)
-                        .header("Authorization", "Bearer " + requesterToken))
+        mockMvc.perform(patch("/exchanges/{id}/respond", exchangeId)
+                        .header("Authorization", "Bearer " + requesterToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body(Map.of("action", "ACCEPT", "selectedBookId", requesterBookId))))
                 .andDo(print())
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.status").value("COMPLETED"));
+                .andExpect(status().isForbidden());
     }
 
     @Test
-    @DisplayName("PATCH /v1/exchanges/{id}/cancel - 요청자가 취소")
-    void cancelExchange() throws Exception {
-        String createResult = mockMvc.perform(post("/v1/exchanges")
+    @DisplayName("PATCH /exchanges/{id}/complete - 수락 후 완료")
+    void completeExchange() throws Exception {
+        String createResult = mockMvc.perform(post("/exchanges")
                         .header("Authorization", "Bearer " + requesterToken)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(body(Map.of(
-                                "requestedBookId", requestedBookId,
-                                "offeredBookId", offeredBookId))))
+                        .content(body(Map.of("targetBookId", targetBookId))))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
 
         Long exchangeId = objectMapper.readTree(createResult).path("data").path("id").asLong();
 
-        mockMvc.perform(patch("/v1/exchanges/{id}/cancel", exchangeId)
+        mockMvc.perform(patch("/exchanges/{id}/respond", exchangeId)
+                        .header("Authorization", "Bearer " + respondentToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body(Map.of("action", "ACCEPT", "selectedBookId", requesterBookId))))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(patch("/exchanges/{id}/complete", exchangeId)
+                        .header("Authorization", "Bearer " + requesterToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body(Map.of("durationDays", 7))))
+                .andDo(print())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("FIRST_EXCHANGED"))
+                .andExpect(jsonPath("$.data.dueDate").isNotEmpty());
+    }
+
+    @Test
+    @DisplayName("PATCH /exchanges/{id}/cancel - 요청자가 취소")
+    void cancelExchange() throws Exception {
+        String createResult = mockMvc.perform(post("/exchanges")
+                        .header("Authorization", "Bearer " + requesterToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body(Map.of("targetBookId", targetBookId))))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        Long exchangeId = objectMapper.readTree(createResult).path("data").path("id").asLong();
+
+        mockMvc.perform(patch("/exchanges/{id}/cancel", exchangeId)
                         .header("Authorization", "Bearer " + requesterToken))
                 .andDo(print())
                 .andExpect(status().isOk())
@@ -284,13 +312,11 @@ class ExchangeControllerTest {
     }
 
     @Test
-    @DisplayName("POST /v1/exchanges - 인증 없으면 401")
+    @DisplayName("POST /exchanges - 인증 없으면 401")
     void createExchange_unauthorized() throws Exception {
-        mockMvc.perform(post("/v1/exchanges")
+        mockMvc.perform(post("/exchanges")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(body(Map.of(
-                                "requestedBookId", requestedBookId,
-                                "offeredBookId", offeredBookId))))
+                        .content(body(Map.of("targetBookId", targetBookId))))
                 .andExpect(status().isUnauthorized());
     }
 }

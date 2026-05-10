@@ -1,7 +1,6 @@
 package app.pagemate.book.dto;
 
 import app.pagemate.book.Book;
-import app.pagemate.book.BookCondition;
 import app.pagemate.book.BookStatus;
 
 import java.time.LocalDateTime;
@@ -11,23 +10,21 @@ public record BookSummaryResponse(
         String title,
         String author,
         String genre,
-        BookCondition condition,
         String imageUrl,
         String coverColor,
         OwnerInfo owner,
         BookStatus status,
-        Double distance,
+        String neighborhood,
         LocalDateTime createdAt
 ) {
     public record OwnerInfo(Long id, String nickname, String profileImage) {}
 
-    public static BookSummaryResponse of(Book book, Double distance) {
+    public static BookSummaryResponse of(Book book) {
         return new BookSummaryResponse(
                 book.getId(),
                 book.getTitle(),
                 book.getAuthor(),
                 book.getGenre(),
-                book.getCondition(),
                 book.getImageUrl(),
                 book.getCoverColor(),
                 new OwnerInfo(
@@ -36,7 +33,7 @@ public record BookSummaryResponse(
                         book.getOwner().getProfileImage()
                 ),
                 book.getStatus(),
-                distance,
+                book.getNeighborhood(),
                 book.getCreatedAt()
         );
     }

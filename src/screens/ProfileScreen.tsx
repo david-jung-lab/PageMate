@@ -1,7 +1,8 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
-  View, Text, Image, ScrollView, TouchableOpacity,
-  StyleSheet, SafeAreaView, StatusBar, ActivityIndicator,
+  View, Text, Image, ScrollView, TouchableOpacity, Modal, TextInput,
+  StyleSheet, SafeAreaView, StatusBar, ActivityIndicator, Alert, Platform,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { colors, radius, spacing } from '../theme/tokens';
@@ -14,6 +15,7 @@ import { Profile } from '../features/profile/types';
 import { BookSummary } from '../features/books/types';
 import { authApi } from '../features/auth/api';
 import { useAuthStore } from '../store';
+import { locationApi, LocationResult } from '../features/locations/api';
 
 type AvatarColor = 'blue' | 'orange' | 'sage' | 'plum' | 'sand' | 'ink';
 type BadgeVariant = 'success' | 'primary' | 'default';
@@ -171,9 +173,124 @@ const SettingsItem: React.FC<SettingsItemProps> = ({ icon, title, subtitle, dang
   </TouchableOpacity>
 );
 
+/* ---------- NeighborhoodSheet ---------- */
+const NeighborhoodSheet: React.FC<{
+  visible: boolean;
+  current: string | null;
+  onClose: () => void;
+  onSave: (loc: string) => void;
+}> = ({ visible, current, onClose, onSave }) => {
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState<LocationResult[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (!query.trim()) { setResults([]); return; }
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(async () => {
+      setSearching(true);
+      try { setResults((await locationApi.search(query.trim())) ?? []); }
+      catch { setResults([]); }
+      finally { setSearching(false); }
+    }, 400);
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, [query]);
+
+  const handlePick = async (r: LocationResult) => {
+    const label = r.district ? `${r.name} · ${r.district}` : r.name;
+    setSaving(true);
+    try {
+      await profileApi.updateMyProfile({ location: label });
+      onSave(label);
+      setQuery(''); setResults([]);
+    } catch { Alert.alert('오류', '동네 저장에 실패했어요.'); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <TouchableOpacity style={nbrStyles.overlay} activeOpacity={1} onPress={onClose} />
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <View style={nbrStyles.sheet}>
+          <View style={nbrStyles.handle} />
+          <Text style={nbrStyles.title}>동네를 설정해주세요</Text>
+          {current && (
+            <View style={nbrStyles.currentRow}>
+              <PMIcon name="location" size={13} color={colors.primary} />
+              <Text style={nbrStyles.currentText}>현재: {current}</Text>
+            </View>
+          )}
+          <View style={nbrStyles.searchRow}>
+            <PMIcon name="search" size={18} color={colors.textTertiary} />
+            <TextInput
+              style={nbrStyles.searchInput}
+              value={query}
+              onChangeText={setQuery}
+              placeholder="동 이름으로 검색"
+              placeholderTextColor={colors.textTertiary}
+              autoCorrect={false}
+            />
+            {searching && <ActivityIndicator size="small" color={colors.primary} />}
+          </View>
+          {results.length > 0 && (
+            <View style={nbrStyles.resultList}>
+              {results.map((r, i) => (
+                <TouchableOpacity
+                  key={`${r.fullAddress}-${i}`}
+                  style={[nbrStyles.resultItem, i > 0 && nbrStyles.resultBorder]}
+                  onPress={() => !saving && handlePick(r)}
+                  activeOpacity={0.75}
+                >
+                  <PMIcon name="location" size={14} color={colors.textTertiary} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={nbrStyles.resultName}>{r.name}</Text>
+                    {r.district && <Text style={nbrStyles.resultSub}>{r.district} · {r.city}</Text>}
+                  </View>
+                  {saving && <ActivityIndicator size="small" color={colors.primary} />}
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+};
+
+const nbrStyles = StyleSheet.create({
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' },
+  sheet: {
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 24,
+    paddingTop: 12,
+    paddingBottom: Platform.OS === 'ios' ? 40 : 24,
+    gap: 14,
+  },
+  handle: { width: 40, height: 4, backgroundColor: colors.border, borderRadius: 2, alignSelf: 'center', marginBottom: 4 },
+  title: { fontSize: 18, fontWeight: '700', color: colors.text, letterSpacing: -0.3 },
+  currentRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  currentText: { fontSize: 13, color: colors.primary, fontWeight: '600' },
+  searchRow: {
+    height: 48, paddingHorizontal: 14, backgroundColor: colors.bg,
+    borderWidth: 1.5, borderColor: colors.border, borderRadius: radius.lg,
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+  },
+  searchInput: { flex: 1, fontSize: 14, color: colors.text, padding: 0 },
+  resultList: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, overflow: 'hidden' },
+  resultItem: { height: 56, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  resultBorder: { borderTopWidth: 1, borderTopColor: colors.border },
+  resultName: { fontSize: 14, fontWeight: '600', color: colors.text },
+  resultSub: { fontSize: 12, color: colors.textTertiary, marginTop: 1 },
+});
+
 /* ---------- ProfileScreen ---------- */
 const ProfileScreen: React.FC = () => {
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [neighborhoodVisible, setNeighborhoodVisible] = useState(false);
   const clearAuth = useAuthStore((s) => s.clearAuth);
 
   const handleLogout = async () => {
@@ -231,6 +348,12 @@ const ProfileScreen: React.FC = () => {
                 onPress={() => router.push('/profile/edit')}
               />
               <SettingsItem
+                icon={<PMIcon name="location" size={18} color={colors.primary} />}
+                title="동네 설정"
+                subtitle={profile?.location ?? '동네를 설정해주세요'}
+                onPress={() => setNeighborhoodVisible(true)}
+              />
+              <SettingsItem
                 icon={<PMIcon name="bell" size={18} color={colors.primary} />}
                 title="알림 설정"
                 subtitle="새 매칭, 메시지, 교환 진행"
@@ -246,6 +369,16 @@ const ProfileScreen: React.FC = () => {
             <Text style={styles.footerBrand}>PageMate · v1.0</Text>
           </ScrollView>
         )}
+
+        <NeighborhoodSheet
+          visible={neighborhoodVisible}
+          current={profile?.location ?? null}
+          onClose={() => setNeighborhoodVisible(false)}
+          onSave={(loc) => {
+            setProfile(p => p ? { ...p, location: loc } : p);
+            setNeighborhoodVisible(false);
+          }}
+        />
 
       </View>
     </SafeAreaView>

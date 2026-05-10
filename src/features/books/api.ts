@@ -10,10 +10,7 @@ export const booksApi = {
   getBooks: async (params?: {
     keyword?: string;
     genre?: string;
-    condition?: string;
-    lat?: number;
-    lng?: number;
-    radiusKm?: number;
+    neighborhood?: string;
     sort?: string;
     page?: number;
     size?: number;
@@ -22,10 +19,8 @@ export const booksApi = {
     return res.data.data;
   },
 
-  getBook: async (id: number, lat?: number, lng?: number) => {
-    const res = await api.get<ApiResponse<BookDetail>>(`/books/${id}`, {
-      params: lat != null ? { lat, lng } : undefined,
-    });
+  getBook: async (id: number) => {
+    const res = await api.get<ApiResponse<BookDetail>>(`/books/${id}`);
     return res.data.data;
   },
 
@@ -36,10 +31,18 @@ export const booksApi = {
     return res.data.data;
   },
 
-  createBook: async (formData: FormData) => {
-    const res = await api.post<ApiResponse<BookDetail>>('/books', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
+  createBook: async (data: {
+    title: string;
+    author: string;
+    publisher?: string;
+    isbn?: string;
+    genre: string;
+    description?: string;
+    coverColor?: string;
+    kakaoThumbnailUrl?: string;
+    neighborhood?: string;
+  }) => {
+    const res = await api.post<ApiResponse<BookDetail>>('/books', data);
     return res.data.data;
   },
 

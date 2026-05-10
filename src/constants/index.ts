@@ -11,12 +11,6 @@ export const KAKAO_REST_API_KEY = process.env.EXPO_PUBLIC_KAKAO_REST_API_KEY ?? 
 
 export const GENRES = ['소설', '에세이', '자기계발', 'SF', '인문', '시', '역사', '과학'];
 
-export const CONDITION_LABELS: Record<string, string> = {
-  LIKE_NEW: '상',
-  GOOD: '중',
-  ACCEPTABLE: '하',
-};
-
 export const STATUS_LABELS: Record<string, string> = {
   AVAILABLE: '교환가능',
   IN_PROGRESS: '교환중',

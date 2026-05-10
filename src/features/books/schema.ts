@@ -6,9 +6,6 @@ export const bookCreateSchema = z.object({
   publisher: z.string().optional(),
   isbn: z.string().optional(),
   genre: z.string().min(1, '장르를 선택해주세요'),
-  condition: z.enum(['LIKE_NEW', 'GOOD', 'ACCEPTABLE'], {
-    error: '컨디션을 선택해주세요',
-  }),
   description: z.string().max(200, '200자 이내로 입력해주세요').optional(),
   coverColor: z.string().optional(),
   kakaoThumbnailUrl: z.string().optional(),

@@ -35,7 +35,7 @@ public class BookController {
     @PostMapping
     public ResponseEntity<ApiResponse<BookDetailResponse>> createBook(
             @AuthenticationPrincipal Long userId,
-            @Valid @ModelAttribute BookCreateRequest req
+            @Valid @RequestBody BookCreateRequest req
     ) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.ok(bookService.createBook(userId, req)));
@@ -45,16 +45,13 @@ public class BookController {
     public ResponseEntity<ApiResponse<BookPageResponse<BookSummaryResponse>>> getBooks(
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) String genre,
-            @RequestParam(required = false) BookCondition condition,
-            @RequestParam(required = false) Double lat,
-            @RequestParam(required = false) Double lng,
-            @RequestParam(defaultValue = "2.0") Double radiusKm,
+            @RequestParam(required = false) String neighborhood,
             @RequestParam(defaultValue = "LATEST") String sort,
             @RequestParam(defaultValue = "0") @Min(0) int page,
             @RequestParam(defaultValue = "20") @Min(1) @Max(50) int size
     ) {
         return ResponseEntity.ok(ApiResponse.ok(
-                bookService.getBooks(keyword, genre, condition, lat, lng, radiusKm, sort, page, size)));
+                bookService.getBooks(keyword, genre, neighborhood, sort, page, size)));
     }
 
     @GetMapping("/me")
@@ -69,11 +66,9 @@ public class BookController {
 
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<BookDetailResponse>> getBook(
-            @PathVariable Long id,
-            @RequestParam(required = false) Double lat,
-            @RequestParam(required = false) Double lng
+            @PathVariable Long id
     ) {
-        return ResponseEntity.ok(ApiResponse.ok(bookService.getBook(id, lat, lng)));
+        return ResponseEntity.ok(ApiResponse.ok(bookService.getBook(id)));
     }
 
     @PatchMapping("/{id}")

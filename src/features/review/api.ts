@@ -1,0 +1,19 @@
+import { api } from '../../lib/api';
+import { Review } from './types';
+
+interface ApiResponse<T> {
+  success: boolean;
+  data: T;
+}
+
+export const reviewApi = {
+  createReview: async (exchangeId: number, rating: number, comment?: string): Promise<Review> => {
+    const res = await api.post<ApiResponse<Review>>(`/exchanges/${exchangeId}/review`, { rating, comment });
+    return res.data.data;
+  },
+
+  hasReviewed: async (exchangeId: number): Promise<boolean> => {
+    const res = await api.get<ApiResponse<boolean>>(`/exchanges/${exchangeId}/review/status`);
+    return res.data.data;
+  },
+};

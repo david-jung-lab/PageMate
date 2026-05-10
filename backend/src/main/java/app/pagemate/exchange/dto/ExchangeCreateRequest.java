@@ -9,8 +9,5 @@ import lombok.NoArgsConstructor;
 public class ExchangeCreateRequest {
 
     @NotNull
-    private Long requestedBookId;
-
-    @NotNull
-    private Long offeredBookId;
+    private Long targetBookId;
 }

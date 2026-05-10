@@ -4,16 +4,18 @@ import app.pagemate.book.Book;
 import app.pagemate.exchange.Exchange;
 import app.pagemate.user.User;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 public record ExchangeResponse(
         Long id,
         BookInfo requestedBook,
-        BookInfo offeredBook,
+        BookInfo selectedBook,
         UserInfo requester,
         UserInfo respondent,
         String status,
         Long chatRoomId,
+        LocalDate dueDate,
         LocalDateTime createdAt
 ) {
     public record BookInfo(
@@ -49,11 +51,12 @@ public record ExchangeResponse(
         return new ExchangeResponse(
                 e.getId(),
                 BookInfo.of(e.getRequestedBook()),
-                BookInfo.of(e.getOfferedBook()),
+                e.getSelectedBook() != null ? BookInfo.of(e.getSelectedBook()) : null,
                 UserInfo.of(e.getRequester()),
                 UserInfo.of(e.getRespondent()),
                 e.getStatus().name(),
                 null,
+                e.getDueDate(),
                 e.getCreatedAt()
         );
     }
@@ -62,11 +65,12 @@ public record ExchangeResponse(
         return new ExchangeResponse(
                 e.getId(),
                 BookInfo.of(e.getRequestedBook()),
-                BookInfo.of(e.getOfferedBook()),
+                e.getSelectedBook() != null ? BookInfo.of(e.getSelectedBook()) : null,
                 UserInfo.of(e.getRequester()),
                 UserInfo.of(e.getRespondent()),
                 e.getStatus().name(),
                 chatRoomId,
+                e.getDueDate(),
                 e.getCreatedAt()
         );
     }

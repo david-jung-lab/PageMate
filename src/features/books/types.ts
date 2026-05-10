@@ -1,4 +1,3 @@
-export type BookCondition = 'LIKE_NEW' | 'GOOD' | 'ACCEPTABLE';
 export type BookStatus = 'AVAILABLE' | 'IN_PROGRESS' | 'COMPLETED';
 export type CoverColor = 'blue' | 'orange' | 'sage' | 'plum' | 'sand' | 'ink';
 
@@ -22,12 +21,11 @@ export interface BookSummary {
   title: string;
   author: string;
   genre: string;
-  condition: BookCondition;
   imageUrl: string | null;
   coverColor: CoverColor;
   owner: BookOwner;
   status: BookStatus;
-  distance: number | null;
+  neighborhood: string | null;
   createdAt: string;
 }
 
@@ -38,12 +36,11 @@ export interface BookDetail {
   publisher: string | null;
   isbn: string | null;
   genre: string;
-  condition: BookCondition;
   description: string | null;
   imageUrl: string | null;
   coverColor: CoverColor;
   status: BookStatus;
-  distance: number | null;
+  neighborhood: string | null;
   owner: BookOwnerDetail;
   createdAt: string;
 }

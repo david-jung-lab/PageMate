@@ -1,5 +1,5 @@
 package app.pagemate.exchange;
 
 public enum ExchangeStatus {
-    PENDING, ACCEPTED, REJECTED, COMPLETED, CANCELLED
+    PENDING, ACCEPTED, FIRST_EXCHANGED, REJECTED, COMPLETED, CANCELLED
 }

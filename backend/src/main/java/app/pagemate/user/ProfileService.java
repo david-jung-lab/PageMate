@@ -113,7 +113,7 @@ public class ProfileService {
         }
         return BookPageResponse.of(
                 bookQueryRepository.findMyBooks(targetId, BookStatus.AVAILABLE, PageRequest.of(page, size)),
-                b -> BookSummaryResponse.of(b, null)
+                b -> BookSummaryResponse.of(b)
         );
     }
 }

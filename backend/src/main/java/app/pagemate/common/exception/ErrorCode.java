@@ -37,6 +37,10 @@ public enum ErrorCode {
     NOTIFICATION_NOT_FOUND("알림을 찾을 수 없습니다.", HttpStatus.NOT_FOUND),
     NOTIFICATION_ACCESS_DENIED("본인 알림에만 접근할 수 있습니다.", HttpStatus.FORBIDDEN),
 
+    // Review
+    REVIEW_NOT_FOUND("평가를 찾을 수 없습니다.", HttpStatus.NOT_FOUND),
+    REVIEW_ALREADY_EXISTS("이미 평가를 남기셨습니다.", HttpStatus.CONFLICT),
+
     // Common
     VALIDATION_ERROR("요청 값 검증에 실패했습니다.", HttpStatus.BAD_REQUEST),
     NOT_FOUND("리소스를 찾을 수 없습니다.", HttpStatus.NOT_FOUND),

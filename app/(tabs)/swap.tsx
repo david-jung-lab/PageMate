@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {
-  View, Text, FlatList, TouchableOpacity,
+  View, Text, FlatList, TouchableOpacity, Modal, Platform,
   StyleSheet, SafeAreaView, StatusBar, ActivityIndicator, Alert,
 } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -17,6 +17,7 @@ import { useAuthStore } from '../../src/store';
 const STATUS_LABELS: Record<ExchangeStatus, string> = {
   PENDING: '요청 중',
   ACCEPTED: '교환 중',
+  FIRST_EXCHANGED: '반납 대기',
   REJECTED: '거절됨',
   COMPLETED: '완료',
   CANCELLED: '취소됨',
@@ -26,6 +27,7 @@ type BadgeVariant = 'warning' | 'primary' | 'danger' | 'success' | 'default';
 const STATUS_VARIANT: Record<ExchangeStatus, BadgeVariant> = {
   PENDING: 'warning',
   ACCEPTED: 'primary',
+  FIRST_EXCHANGED: 'warning',
   REJECTED: 'danger',
   COMPLETED: 'success',
   CANCELLED: 'default',
@@ -35,11 +37,13 @@ type Tab = 'active' | 'done';
 
 export default function SwapScreen() {
   const [tab, setTab] = useState<Tab>('active');
+  const [periodModal, setPeriodModal] = useState<{ exchangeId: number } | null>(null);
+  const [selectedDays, setSelectedDays] = useState(7);
   const queryClient = useQueryClient();
   const router = useRouter();
   const myUserId = useAuthStore((s) => s.user?.id);
 
-  const activeStatuses: ExchangeStatus[] = ['PENDING', 'ACCEPTED'];
+  const activeStatuses: ExchangeStatus[] = ['PENDING', 'ACCEPTED', 'FIRST_EXCHANGED'];
   const doneStatuses: ExchangeStatus[] = ['REJECTED', 'COMPLETED', 'CANCELLED'];
 
   const { data: activeData, isLoading: activeLoading } = useQuery({
@@ -47,27 +51,23 @@ export default function SwapScreen() {
     queryFn: () => exchangeApi.getMyExchanges(undefined, 0, 50),
   });
 
-  const acceptMutation = useMutation({
-    mutationFn: exchangeApi.acceptExchange,
-    onSuccess: (exchange) => {
-      queryClient.invalidateQueries({ queryKey: ['exchanges'] });
-      if (exchange.chatRoomId) {
-        router.push(`/chat/${exchange.chatRoomId}` as any);
-      }
-    },
-    onError: () => Alert.alert('오류', '수락에 실패했어요.'),
-  });
-
-  const rejectMutation = useMutation({
-    mutationFn: exchangeApi.rejectExchange,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['exchanges'] }),
-    onError: () => Alert.alert('오류', '거절에 실패했어요.'),
-  });
-
   const completeMutation = useMutation({
-    mutationFn: exchangeApi.completeExchange,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['exchanges'] }),
+    mutationFn: ({ id, durationDays }: { id: number; durationDays: number }) =>
+      exchangeApi.completeExchange(id, durationDays),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['exchanges'] });
+      setPeriodModal(null);
+    },
     onError: () => Alert.alert('오류', '완료 처리에 실패했어요.'),
+  });
+
+  const completeSecondMutation = useMutation({
+    mutationFn: exchangeApi.completeSecondExchange,
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['exchanges'] });
+      router.push(`/exchanges/${data.id}/review` as any);
+    },
+    onError: () => Alert.alert('오류', '반납 완료 처리에 실패했어요.'),
   });
 
   const cancelMutation = useMutation({
@@ -77,30 +77,19 @@ export default function SwapScreen() {
   });
 
   const allExchanges = activeData?.content ?? [];
-  const displayed = allExchanges.filter(e =>
-    tab === 'active'
-      ? activeStatuses.includes(e.status)
-      : doneStatuses.includes(e.status)
-  );
-
-  const handleAccept = (id: number) => {
-    Alert.alert('교환 수락', '교환 요청을 수락하시겠어요?', [
-      { text: '취소', style: 'cancel' },
-      { text: '수락', onPress: () => acceptMutation.mutate(id) },
-    ]);
-  };
-
-  const handleReject = (id: number) => {
-    Alert.alert('교환 거절', '교환 요청을 거절하시겠어요?', [
-      { text: '취소', style: 'cancel' },
-      { text: '거절', style: 'destructive', onPress: () => rejectMutation.mutate(id) },
-    ]);
-  };
+  const activeList = allExchanges.filter(e => activeStatuses.includes(e.status));
+  const doneList   = allExchanges.filter(e => doneStatuses.includes(e.status));
+  const displayed  = tab === 'active' ? activeList : doneList;
 
   const handleComplete = (id: number) => {
-    Alert.alert('교환 완료', '교환이 완료됐나요?', [
+    setSelectedDays(7);
+    setPeriodModal({ exchangeId: id });
+  };
+
+  const handleSecondComplete = (id: number) => {
+    Alert.alert('반납 완료', '책을 돌려받으셨나요?', [
       { text: '취소', style: 'cancel' },
-      { text: '완료', onPress: () => completeMutation.mutate(id) },
+      { text: '완료', onPress: () => completeSecondMutation.mutate(id) },
     ]);
   };
 
@@ -123,20 +112,30 @@ export default function SwapScreen() {
       </View>
 
       <View style={styles.booksRow}>
-        <BookMini
-          title={item.offeredBook.title}
-          author={item.offeredBook.author}
-          imageUrl={item.offeredBook.imageUrl}
-          coverColor={item.offeredBook.coverColor}
-          label="내 책"
-        />
+        {item.selectedBook ? (
+          <BookMini
+            title={item.selectedBook.title}
+            author={item.selectedBook.author}
+            imageUrl={item.selectedBook.imageUrl}
+            coverColor={item.selectedBook.coverColor}
+            label="내 책"
+          />
+        ) : (
+          <View style={styles.bookMini}>
+            <Text style={styles.bookMiniLabel}>내 책</Text>
+            <View style={styles.bookMiniPlaceholder}>
+              <PMIcon name="swap" size={20} color={colors.borderStrong} />
+            </View>
+            <Text style={styles.bookMiniTitle}>선택 대기 중</Text>
+          </View>
+        )}
         <PMIcon name="swap" size={20} color={colors.textTertiary} />
         <BookMini
           title={item.requestedBook.title}
           author={item.requestedBook.author}
           imageUrl={item.requestedBook.imageUrl}
           coverColor={item.requestedBook.coverColor}
-          label="상대 책"
+          label="원하는 책"
         />
       </View>
 
@@ -153,12 +152,18 @@ export default function SwapScreen() {
 
       {item.status === 'PENDING' && (
         <View style={styles.actions}>
-          <ActionButtons
-            onAccept={() => handleAccept(item.id)}
-            onReject={() => handleReject(item.id)}
-            onCancel={() => handleCancel(item.id)}
-            isRespondent={item.respondent.id === myUserId}
-          />
+          {item.respondent.id === myUserId ? (
+            <TouchableOpacity
+              style={styles.btnPrimary}
+              onPress={() => router.push(`/exchanges/${item.id}/respond` as any)}
+            >
+              <Text style={styles.btnPrimaryText}>요청 확인하기</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity style={styles.btnDanger} onPress={() => handleCancel(item.id)}>
+              <Text style={styles.btnDangerText}>요청 취소</Text>
+            </TouchableOpacity>
+          )}
         </View>
       )}
 
@@ -173,16 +178,100 @@ export default function SwapScreen() {
             </TouchableOpacity>
           )}
           <TouchableOpacity style={styles.btnPrimary} onPress={() => handleComplete(item.id)}>
-            <Text style={styles.btnPrimaryText}>교환 완료</Text>
+            <Text style={styles.btnPrimaryText}>1차 교환 완료</Text>
           </TouchableOpacity>
         </View>
+      )}
+
+      {item.status === 'FIRST_EXCHANGED' && (
+        <>
+          {item.dueDate && (() => {
+            const daysLeft = Math.ceil((new Date(item.dueDate).getTime() - Date.now()) / 86400000);
+            return (
+              <View style={styles.dueDateRow}>
+                <Text style={styles.dueDateLabel}>
+                  반납 기한 · {item.dueDate}
+                </Text>
+                <Text style={[styles.dueDateValue, daysLeft <= 3 && { color: '#EF4444' }]}>
+                  {daysLeft > 0 ? `D-${daysLeft}` : daysLeft === 0 ? 'D-day' : '기한 초과'}
+                </Text>
+              </View>
+            );
+          })()}
+          <View style={styles.actions}>
+            <TouchableOpacity style={styles.btnPrimary} onPress={() => handleSecondComplete(item.id)}>
+              <Text style={styles.btnPrimaryText}>반납 완료</Text>
+            </TouchableOpacity>
+          </View>
+        </>
       )}
     </View>
   );
 
+  const dueDate = periodModal
+    ? new Date(Date.now() + selectedDays * 86400000).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })
+    : '';
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" backgroundColor={colors.bg} />
+
+      {/* 기간 선택 바텀시트 */}
+      <Modal
+        visible={!!periodModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setPeriodModal(null)}
+      >
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setPeriodModal(null)} />
+        <View style={styles.bottomSheet}>
+          <View style={styles.sheetHandle} />
+          <Text style={styles.sheetTitle}>몇 일 후에 책을{'\n'}돌려드릴까요?</Text>
+          <Text style={styles.sheetSub}>7일을 권장해요.</Text>
+
+          {/* 슬라이더 (터치 기반 스텝 버튼) */}
+          <View style={styles.sliderRow}>
+            <TouchableOpacity
+              style={styles.stepBtn}
+              onPress={() => setSelectedDays(d => Math.max(1, d - 1))}
+            >
+              <Text style={styles.stepBtnText}>−</Text>
+            </TouchableOpacity>
+            <View style={styles.daysDisplay}>
+              <Text style={styles.daysNumber}>{selectedDays}</Text>
+              <Text style={styles.daysUnit}>일</Text>
+              {selectedDays === 7 && <Text style={styles.recommendBadge}>권장 기간 ✓</Text>}
+            </View>
+            <TouchableOpacity
+              style={styles.stepBtn}
+              onPress={() => setSelectedDays(d => Math.min(30, d + 1))}
+            >
+              <Text style={styles.stepBtnText}>+</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.stepTrack}>
+            {[1, 7, 14, 21, 30].map(v => (
+              <TouchableOpacity key={v} onPress={() => setSelectedDays(v)} style={styles.stepChip}>
+                <Text style={[styles.stepChipText, selectedDays === v && styles.stepChipActive]}>{v}일</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <View style={styles.dueDatePreview}>
+            <Text style={styles.dueDatePreviewLabel}>완료 시 자동 계산: 2차 교환 기한 →</Text>
+            <Text style={styles.dueDatePreviewValue}>{dueDate}</Text>
+          </View>
+
+          <TouchableOpacity
+            style={[styles.btnPrimary, styles.sheetConfirmBtn, completeMutation.isPending && { opacity: 0.6 }]}
+            disabled={completeMutation.isPending}
+            onPress={() => periodModal && completeMutation.mutate({ id: periodModal.exchangeId, durationDays: selectedDays })}
+          >
+            <Text style={styles.btnPrimaryText}>완료</Text>
+          </TouchableOpacity>
+        </View>
+      </Modal>
 
       <View style={styles.topBar}>
         <Text style={styles.title}>교환</Text>
@@ -194,12 +283,22 @@ export default function SwapScreen() {
           onPress={() => setTab('active')}
         >
           <Text style={[styles.tabText, tab === 'active' && styles.tabTextActive]}>진행 중</Text>
+          {activeList.length > 0 && (
+            <View style={styles.tabBadge}>
+              <Text style={styles.tabBadgeText}>{activeList.length}</Text>
+            </View>
+          )}
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.tab, tab === 'done' && styles.tabActive]}
           onPress={() => setTab('done')}
         >
           <Text style={[styles.tabText, tab === 'done' && styles.tabTextActive]}>완료·거절</Text>
+          {doneList.length > 0 && (
+            <View style={[styles.tabBadge, styles.tabBadgeDone]}>
+              <Text style={styles.tabBadgeText}>{doneList.length}</Text>
+            </View>
+          )}
         </TouchableOpacity>
       </View>
 
@@ -246,32 +345,6 @@ function BookMini({
   );
 }
 
-function ActionButtons({
-  onAccept, onReject, onCancel, isRespondent,
-}: {
-  onAccept: () => void;
-  onReject: () => void;
-  onCancel: () => void;
-  isRespondent: boolean;
-}) {
-  if (isRespondent) {
-    return (
-      <>
-        <TouchableOpacity style={styles.btnSecondary} onPress={onReject}>
-          <Text style={styles.btnSecondaryText}>거절</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.btnPrimary} onPress={onAccept}>
-          <Text style={styles.btnPrimaryText}>수락</Text>
-        </TouchableOpacity>
-      </>
-    );
-  }
-  return (
-    <TouchableOpacity style={styles.btnDanger} onPress={onCancel}>
-      <Text style={styles.btnDangerText}>요청 취소</Text>
-    </TouchableOpacity>
-  );
-}
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: colors.bg },
@@ -290,10 +363,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.s4,
     gap: 24,
   },
-  tab: { paddingVertical: 12 },
+  tab: { paddingVertical: 12, flexDirection: 'row', alignItems: 'center', gap: 6 },
   tabActive: { borderBottomWidth: 2, borderBottomColor: colors.primary },
   tabText: { fontSize: 14, color: colors.textTertiary, fontWeight: '600' },
   tabTextActive: { color: colors.primary },
+  tabBadge: {
+    minWidth: 18, height: 18, borderRadius: 9,
+    backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  tabBadgeDone: { backgroundColor: colors.textTertiary },
+  tabBadgeText: { fontSize: 10, fontWeight: '700', color: '#fff' },
 
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
   emptyText: { fontSize: 14, color: colors.textTertiary },
@@ -324,6 +404,17 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     textAlign: 'center',
     lineHeight: 15,
+  },
+  bookMiniPlaceholder: {
+    width: 72,
+    height: 100,
+    backgroundColor: colors.surface2,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderStyle: 'dashed',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   partnerRow: {
@@ -367,4 +458,93 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   btnDangerText: { fontSize: 13, fontWeight: '700', color: colors.danger },
+
+  dueDateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.surface2,
+    borderRadius: radius.md,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  dueDateLabel: { fontSize: 12, color: colors.textSecondary },
+  dueDateValue: { fontSize: 12, fontWeight: '700', color: colors.primary },
+
+  // 바텀시트
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' },
+  bottomSheet: {
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 24,
+    paddingTop: 12,
+    paddingBottom: Platform.OS === 'ios' ? 40 : 24,
+    gap: 16,
+  },
+  sheetHandle: {
+    width: 40, height: 4,
+    backgroundColor: colors.border,
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 4,
+  },
+  sheetTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: colors.text,
+    lineHeight: 32,
+    letterSpacing: -0.4,
+  },
+  sheetSub: { fontSize: 14, color: colors.textSecondary, marginTop: -8 },
+
+  sliderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 16,
+  },
+  stepBtn: {
+    width: 48, height: 48,
+    borderRadius: 24,
+    backgroundColor: colors.surface2,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepBtnText: { fontSize: 22, color: colors.text, lineHeight: 26 },
+  daysDisplay: { flex: 1, alignItems: 'center', gap: 2 },
+  daysNumber: { fontSize: 40, fontWeight: '700', color: colors.primary, lineHeight: 46 },
+  daysUnit: { fontSize: 14, color: colors.textSecondary },
+  recommendBadge: { fontSize: 11, color: colors.primary, fontWeight: '600' },
+
+  stepTrack: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  stepChip: {
+    flex: 1,
+    height: 34,
+    backgroundColor: colors.surface2,
+    borderRadius: radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  stepChipText: { fontSize: 12, color: colors.textSecondary, fontWeight: '600' },
+  stepChipActive: { color: colors.primary },
+
+  dueDatePreview: {
+    backgroundColor: colors.surface2,
+    borderRadius: radius.md,
+    padding: 12,
+    gap: 4,
+  },
+  dueDatePreviewLabel: { fontSize: 12, color: colors.textSecondary },
+  dueDatePreviewValue: { fontSize: 14, fontWeight: '700', color: colors.text },
+
+  sheetConfirmBtn: { height: 52, borderRadius: radius.lg },
 });

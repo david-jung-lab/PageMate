@@ -14,7 +14,10 @@ import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import Svg, { Path, Circle } from 'react-native-svg';
 import { booksApi } from '../../src/features/books/api';
+import { exchangeApi } from '../../src/features/exchange/api';
+import { profileApi } from '../../src/features/profile/api';
 import { CoverColor } from '../../src/features/books/types';
+import { Exchange } from '../../src/features/exchange/types';
 import { useAuthStore } from '../../src/store';
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
@@ -67,12 +70,92 @@ const ChevronRight = ({ size = 12, color = C.text2 }: { size?: number; color?: s
   </Svg>
 );
 
+// ─── Active exchange card ─────────────────────────────────────────────────────
+function calcDaysLeft(dueDate: string | null): number | null {
+  if (!dueDate) return null;
+  return Math.ceil((new Date(dueDate).getTime() - Date.now()) / 86400000);
+}
+
+const ActiveExchangeCard = ({ exchange, onChat }: { exchange: Exchange; onChat?: () => void }) => {
+  const daysLeft = calcDaysLeft(exchange.dueDate);
+  const partner = exchange.respondent;
+  return (
+    <TouchableOpacity style={activeExSt.card} activeOpacity={0.85} onPress={onChat}>
+      <View style={activeExSt.topRow}>
+        <Text style={activeExSt.badge}>
+          {exchange.status === 'FIRST_EXCHANGED' ? '반납 대기' : '교환 중'}
+        </Text>
+        {daysLeft != null && (
+          <Text style={[activeExSt.dDay, daysLeft <= 3 && { color: '#EF4444' }]}>
+            {daysLeft > 0 ? `D-${daysLeft}` : daysLeft === 0 ? 'D-day' : '기한 초과'}
+          </Text>
+        )}
+      </View>
+      <Text style={activeExSt.partner}>{partner.nickname}님과 교환 중</Text>
+      <View style={activeExSt.booksRow}>
+        <Text style={activeExSt.bookTitle} numberOfLines={1}>
+          {exchange.selectedBook?.title ?? '(대기 중)'}
+        </Text>
+        <Text style={activeExSt.arrow}>↔</Text>
+        <Text style={activeExSt.bookTitle} numberOfLines={1}>
+          {exchange.requestedBook.title}
+        </Text>
+      </View>
+      {exchange.chatRoomId && (
+        <View style={activeExSt.chatBtn}>
+          <Text style={activeExSt.chatBtnText}>채팅 바로가기</Text>
+        </View>
+      )}
+    </TouchableOpacity>
+  );
+};
+
+const activeExSt = StyleSheet.create({
+  card: {
+    marginHorizontal: 20,
+    backgroundColor: C.card,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: C.line,
+    padding: 16,
+    gap: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  badge: { fontSize: 11, fontWeight: '700', color: C.primary, backgroundColor: '#EEF2FF', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
+  dDay: { fontSize: 13, fontWeight: '700', color: C.primary },
+  partner: { fontSize: 15, fontWeight: '700', color: C.text, letterSpacing: -0.3 },
+  booksRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  bookTitle: { flex: 1, fontSize: 13, color: C.text2, letterSpacing: -0.2 },
+  arrow: { fontSize: 14, color: C.text3, fontWeight: '700' },
+  chatBtn: {
+    marginTop: 4,
+    backgroundColor: C.primary,
+    borderRadius: 10,
+    paddingVertical: 8,
+    alignItems: 'center',
+  },
+  chatBtnText: { fontSize: 13, fontWeight: '700', color: '#FFFFFF' },
+});
+
+const ShareIcon = () => (
+  <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+    <Path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" stroke="#FFFFFF" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+    <Path d="m16 6-4-4-4 4" stroke="#FFFFFF" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+    <Path d="M12 2v13" stroke="#FFFFFF" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+  </Svg>
+);
+
 // ─── Near book card (image + title + location) ────────────────────────────────
 const NearBookCard = ({
-  title, author, imageUrl, color, distance, ownerNickname, onPress,
+  title, author, imageUrl, color, neighborhood, ownerNickname, onPress,
 }: {
   title: string; author: string; imageUrl: string | null;
-  color: CoverColor; distance: number | null; ownerNickname: string; onPress: () => void;
+  color: CoverColor; neighborhood: string | null; ownerNickname: string; onPress: () => void;
 }) => {
   const { bg, fg } = MINI_COVER[color] ?? MINI_COVER.blue;
   return (
@@ -95,8 +178,10 @@ const NearBookCard = ({
         <Text style={nearCardSt.title} numberOfLines={1}>{title}</Text>
         <Text style={nearCardSt.author} numberOfLines={1}>{author}</Text>
         <View style={nearCardSt.locRow}>
-          <PinIcon size={10} color={C.text3} />
-          <Text style={nearCardSt.locText}>{formatDist(distance)} · {ownerNickname}</Text>
+          <View style={nearCardSt.pinWrapper}>
+            <PinIcon size={10} color={C.text3} />
+          </View>
+          <Text style={nearCardSt.locText} numberOfLines={2}>{neighborhood ?? '위치 미설정'} · {ownerNickname}</Text>
         </View>
       </View>
     </TouchableOpacity>
@@ -155,8 +240,9 @@ const nearCardSt = StyleSheet.create({
   meta: { paddingHorizontal: 14, paddingTop: 12, paddingBottom: 14, gap: 4 },
   title: { fontSize: 14, fontWeight: '700', color: C.text, letterSpacing: -0.3 },
   author: { fontSize: 12, color: C.text2, letterSpacing: -0.2, marginBottom: 2 },
-  locRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  locText: { fontSize: 12, color: C.text3 },
+  locRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 4 },
+  pinWrapper: { marginTop: 2 },
+  locText: { fontSize: 12, color: C.text3, flex: 1, lineHeight: 17 },
 });
 
 // ─── Recent book cover (square image) ────────────────────────────────────────
@@ -216,11 +302,6 @@ const secStyles = StyleSheet.create({
 });
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-function formatDist(d: number | null): string {
-  if (d == null) return '근처';
-  return d < 1 ? `${Math.round(d * 1000)}m` : `${d.toFixed(1)}km`;
-}
-
 function formatTime(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
   const min = Math.floor(diff / 60000);
@@ -234,7 +315,15 @@ function formatTime(iso: string): string {
 export default function HomeScreen() {
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
-  const nickname = user?.nickname ?? '독자';
+
+  const { data: profile } = useQuery({
+    queryKey: ['profile', 'me'],
+    queryFn: () => profileApi.getMyProfile(),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const nickname = profile?.nickname ?? user?.nickname ?? '독자';
+  const location = profile?.location ?? null;
 
   const { data: nearBooks, isLoading: nearLoading } = useQuery({
     queryKey: ['books', 'near'],
@@ -244,6 +333,14 @@ export default function HomeScreen() {
   const { data: recentBooks, isLoading: recentLoading } = useQuery({
     queryKey: ['books', 'recent'],
     queryFn: () => booksApi.getBooks({ sort: 'LATEST', page: 0, size: 5 }),
+  });
+
+  const { data: activeExchanges } = useQuery({
+    queryKey: ['exchanges', 'active-home'],
+    queryFn: () => exchangeApi.getMyExchanges(undefined, 0, 10),
+    select: (data) => data.content.filter(
+      (e) => e.status === 'ACCEPTED' || e.status === 'FIRST_EXCHANGED'
+    ),
   });
 
   return (
@@ -269,11 +366,27 @@ export default function HomeScreen() {
             <Text style={s.accent}>오늘의 책</Text>
             {'을 만나보세요'}
           </Text>
-          <View style={s.locRow}>
-            <PinIcon />
-            <Text style={s.locText}>망원동 · 반경 2km · 독자 184명</Text>
-          </View>
+          {location && (
+            <View style={s.locRow}>
+              <PinIcon />
+              <Text style={s.locText}>{location}</Text>
+            </View>
+          )}
         </View>
+
+        {/* 진행 중인 교환독서 */}
+        {activeExchanges && activeExchanges.length > 0 && (
+          <View style={s.section}>
+            <SectionHeader title="진행 중인 교환독서" sub={`${activeExchanges.length}건 진행 중`} onMore={() => router.push('/(tabs)/swap' as any)} />
+            {activeExchanges.slice(0, 1).map((ex) => (
+              <ActiveExchangeCard
+                key={ex.id}
+                exchange={ex}
+                onChat={ex.chatRoomId ? () => router.push(`/chat/${ex.chatRoomId}` as any) : undefined}
+              />
+            ))}
+          </View>
+        )}
 
         {/* Search */}
         <TouchableOpacity
@@ -307,7 +420,7 @@ export default function HomeScreen() {
                   author={b.author}
                   imageUrl={b.imageUrl}
                   color={b.coverColor}
-                  distance={b.distance}
+                  neighborhood={b.neighborhood}
                   ownerNickname={b.owner.nickname}
                   onPress={() => router.push(`/books/${b.id}`)}
                 />
@@ -359,6 +472,15 @@ export default function HomeScreen() {
         </View>
 
       </ScrollView>
+
+      {/* Share FAB */}
+      <TouchableOpacity
+        style={s.fab}
+        onPress={() => router.push('/shares/new')}
+        activeOpacity={0.85}
+      >
+        <ShareIcon />
+      </TouchableOpacity>
     </SafeAreaView>
   );
 }
@@ -463,4 +585,21 @@ const s = StyleSheet.create({
   quoteAuthor: { marginTop: 8, fontSize: 11, color: C.text3, letterSpacing: -0.2 },
 
   emptyText: { fontSize: 13, color: C.text3, paddingHorizontal: 20, paddingVertical: 8 },
+
+  fab: {
+    position: 'absolute',
+    bottom: 24,
+    right: 20,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: C.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: C.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    elevation: 8,
+  },
 });
