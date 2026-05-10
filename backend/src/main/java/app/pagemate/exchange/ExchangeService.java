@@ -66,13 +66,13 @@ public class ExchangeService {
     public Page<ExchangeResponse> getMyExchanges(Long userId, ExchangeStatus status, int page, int size) {
         return exchangeRepository
                 .findMyExchanges(userId, status, PageRequest.of(page, size))
-                .map(ExchangeResponse::of);
+                .map(this::toResponse);
     }
 
     public ExchangeResponse getExchange(Long userId, Long exchangeId) {
         Exchange exchange = getExchangeById(exchangeId);
         checkParticipant(userId, exchange);
-        return ExchangeResponse.of(exchange);
+        return toResponse(exchange);
     }
 
     public List<ExchangeResponse.BookInfo> getRequesterBooks(Long userId, Long exchangeId) {
@@ -187,6 +187,13 @@ public class ExchangeService {
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────
+
+    private ExchangeResponse toResponse(Exchange e) {
+        Long chatRoomId = chatRoomRepository.findByExchangeId(e.getId())
+                .map(ChatRoom::getId)
+                .orElse(null);
+        return ExchangeResponse.of(e, chatRoomId);
+    }
 
     private User getUser(Long userId) {
         return userRepository.findById(userId)

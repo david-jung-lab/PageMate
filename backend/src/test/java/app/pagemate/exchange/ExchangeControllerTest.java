@@ -283,10 +283,13 @@ class ExchangeControllerTest {
                 .andExpect(status().isOk());
 
         mockMvc.perform(patch("/exchanges/{id}/complete", exchangeId)
-                        .header("Authorization", "Bearer " + requesterToken))
+                        .header("Authorization", "Bearer " + requesterToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body(Map.of("durationDays", 7))))
                 .andDo(print())
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.status").value("COMPLETED"));
+                .andExpect(jsonPath("$.data.status").value("FIRST_EXCHANGED"))
+                .andExpect(jsonPath("$.data.dueDate").isNotEmpty());
     }
 
     @Test
