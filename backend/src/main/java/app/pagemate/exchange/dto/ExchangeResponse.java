@@ -9,7 +9,7 @@ import java.time.LocalDateTime;
 public record ExchangeResponse(
         Long id,
         BookInfo requestedBook,
-        BookInfo offeredBook,
+        BookInfo selectedBook,
         UserInfo requester,
         UserInfo respondent,
         String status,
@@ -49,7 +49,7 @@ public record ExchangeResponse(
         return new ExchangeResponse(
                 e.getId(),
                 BookInfo.of(e.getRequestedBook()),
-                BookInfo.of(e.getOfferedBook()),
+                e.getSelectedBook() != null ? BookInfo.of(e.getSelectedBook()) : null,
                 UserInfo.of(e.getRequester()),
                 UserInfo.of(e.getRespondent()),
                 e.getStatus().name(),
@@ -62,7 +62,7 @@ public record ExchangeResponse(
         return new ExchangeResponse(
                 e.getId(),
                 BookInfo.of(e.getRequestedBook()),
-                BookInfo.of(e.getOfferedBook()),
+                e.getSelectedBook() != null ? BookInfo.of(e.getSelectedBook()) : null,
                 UserInfo.of(e.getRequester()),
                 UserInfo.of(e.getRespondent()),
                 e.getStatus().name(),

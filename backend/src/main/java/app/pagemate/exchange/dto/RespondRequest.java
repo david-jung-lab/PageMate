@@ -6,8 +6,10 @@ import lombok.NoArgsConstructor;
 
 @Getter
 @NoArgsConstructor
-public class ExchangeCreateRequest {
+public class RespondRequest {
 
     @NotNull
-    private Long targetBookId;
+    private String action; // "ACCEPT" or "REJECT"
+
+    private Long selectedBookId; // ACCEPT 시 필수
 }

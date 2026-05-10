@@ -47,23 +47,6 @@ export default function SwapScreen() {
     queryFn: () => exchangeApi.getMyExchanges(undefined, 0, 50),
   });
 
-  const acceptMutation = useMutation({
-    mutationFn: exchangeApi.acceptExchange,
-    onSuccess: (exchange) => {
-      queryClient.invalidateQueries({ queryKey: ['exchanges'] });
-      if (exchange.chatRoomId) {
-        router.push(`/chat/${exchange.chatRoomId}` as any);
-      }
-    },
-    onError: () => Alert.alert('오류', '수락에 실패했어요.'),
-  });
-
-  const rejectMutation = useMutation({
-    mutationFn: exchangeApi.rejectExchange,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['exchanges'] }),
-    onError: () => Alert.alert('오류', '거절에 실패했어요.'),
-  });
-
   const completeMutation = useMutation({
     mutationFn: exchangeApi.completeExchange,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['exchanges'] }),
@@ -82,20 +65,6 @@ export default function SwapScreen() {
       ? activeStatuses.includes(e.status)
       : doneStatuses.includes(e.status)
   );
-
-  const handleAccept = (id: number) => {
-    Alert.alert('교환 수락', '교환 요청을 수락하시겠어요?', [
-      { text: '취소', style: 'cancel' },
-      { text: '수락', onPress: () => acceptMutation.mutate(id) },
-    ]);
-  };
-
-  const handleReject = (id: number) => {
-    Alert.alert('교환 거절', '교환 요청을 거절하시겠어요?', [
-      { text: '취소', style: 'cancel' },
-      { text: '거절', style: 'destructive', onPress: () => rejectMutation.mutate(id) },
-    ]);
-  };
 
   const handleComplete = (id: number) => {
     Alert.alert('교환 완료', '교환이 완료됐나요?', [
@@ -123,20 +92,30 @@ export default function SwapScreen() {
       </View>
 
       <View style={styles.booksRow}>
-        <BookMini
-          title={item.offeredBook.title}
-          author={item.offeredBook.author}
-          imageUrl={item.offeredBook.imageUrl}
-          coverColor={item.offeredBook.coverColor}
-          label="내 책"
-        />
+        {item.selectedBook ? (
+          <BookMini
+            title={item.selectedBook.title}
+            author={item.selectedBook.author}
+            imageUrl={item.selectedBook.imageUrl}
+            coverColor={item.selectedBook.coverColor}
+            label="내 책"
+          />
+        ) : (
+          <View style={styles.bookMini}>
+            <Text style={styles.bookMiniLabel}>내 책</Text>
+            <View style={styles.bookMiniPlaceholder}>
+              <PMIcon name="swap" size={20} color={colors.borderStrong} />
+            </View>
+            <Text style={styles.bookMiniTitle}>선택 대기 중</Text>
+          </View>
+        )}
         <PMIcon name="swap" size={20} color={colors.textTertiary} />
         <BookMini
           title={item.requestedBook.title}
           author={item.requestedBook.author}
           imageUrl={item.requestedBook.imageUrl}
           coverColor={item.requestedBook.coverColor}
-          label="상대 책"
+          label="원하는 책"
         />
       </View>
 
@@ -153,12 +132,18 @@ export default function SwapScreen() {
 
       {item.status === 'PENDING' && (
         <View style={styles.actions}>
-          <ActionButtons
-            onAccept={() => handleAccept(item.id)}
-            onReject={() => handleReject(item.id)}
-            onCancel={() => handleCancel(item.id)}
-            isRespondent={item.respondent.id === myUserId}
-          />
+          {item.respondent.id === myUserId ? (
+            <TouchableOpacity
+              style={styles.btnPrimary}
+              onPress={() => router.push(`/exchanges/${item.id}/respond` as any)}
+            >
+              <Text style={styles.btnPrimaryText}>요청 확인하기</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity style={styles.btnDanger} onPress={() => handleCancel(item.id)}>
+              <Text style={styles.btnDangerText}>요청 취소</Text>
+            </TouchableOpacity>
+          )}
         </View>
       )}
 
@@ -246,32 +231,6 @@ function BookMini({
   );
 }
 
-function ActionButtons({
-  onAccept, onReject, onCancel, isRespondent,
-}: {
-  onAccept: () => void;
-  onReject: () => void;
-  onCancel: () => void;
-  isRespondent: boolean;
-}) {
-  if (isRespondent) {
-    return (
-      <>
-        <TouchableOpacity style={styles.btnSecondary} onPress={onReject}>
-          <Text style={styles.btnSecondaryText}>거절</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.btnPrimary} onPress={onAccept}>
-          <Text style={styles.btnPrimaryText}>수락</Text>
-        </TouchableOpacity>
-      </>
-    );
-  }
-  return (
-    <TouchableOpacity style={styles.btnDanger} onPress={onCancel}>
-      <Text style={styles.btnDangerText}>요청 취소</Text>
-    </TouchableOpacity>
-  );
-}
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: colors.bg },
@@ -324,6 +283,17 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     textAlign: 'center',
     lineHeight: 15,
+  },
+  bookMiniPlaceholder: {
+    width: 72,
+    height: 100,
+    backgroundColor: colors.surface2,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderStyle: 'dashed',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   partnerRow: {

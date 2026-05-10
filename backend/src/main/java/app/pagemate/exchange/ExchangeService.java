@@ -12,6 +12,7 @@ import app.pagemate.common.exception.ErrorCode;
 import app.pagemate.common.exception.PagemateException;
 import app.pagemate.exchange.dto.ExchangeCreateRequest;
 import app.pagemate.exchange.dto.ExchangeResponse;
+import app.pagemate.exchange.dto.RespondRequest;
 import app.pagemate.user.User;
 import app.pagemate.user.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -36,31 +37,17 @@ public class ExchangeService {
     @Transactional
     public ExchangeResponse createExchange(Long requesterId, ExchangeCreateRequest req) {
         User requester = getUser(requesterId);
+        Book targetBook = getBook(req.getTargetBookId());
 
-        Book requestedBook = getBook(req.getRequestedBookId());
-        Book offeredBook = getBook(req.getOfferedBookId());
-
-        // 본인 도서에 요청 금지
-        if (requestedBook.getOwner().getId().equals(requesterId)) {
+        if (targetBook.getOwner().getId().equals(requesterId)) {
             throw new PagemateException(ErrorCode.SELF_EXCHANGE);
         }
-
-        // 제안 도서는 본인 소유여야 함
-        if (!offeredBook.getOwner().getId().equals(requesterId)) {
-            throw new PagemateException(ErrorCode.BOOK_ACCESS_DENIED);
-        }
-
-        // 두 도서 모두 AVAILABLE 상태여야 함
-        if (requestedBook.getStatus() != BookStatus.AVAILABLE) {
-            throw new PagemateException(ErrorCode.BOOK_NOT_AVAILABLE);
-        }
-        if (offeredBook.getStatus() != BookStatus.AVAILABLE) {
+        if (targetBook.getStatus() != BookStatus.AVAILABLE) {
             throw new PagemateException(ErrorCode.BOOK_NOT_AVAILABLE);
         }
 
-        // 이미 PENDING/ACCEPTED 중복 요청 방지
         boolean duplicate = exchangeRepository.existsByRequesterIdAndRequestedBookIdAndStatusIn(
-                requesterId, req.getRequestedBookId(),
+                requesterId, req.getTargetBookId(),
                 List.of(ExchangeStatus.PENDING, ExchangeStatus.ACCEPTED));
         if (duplicate) {
             throw new PagemateException(ErrorCode.DUPLICATE_REQUEST);
@@ -68,9 +55,8 @@ public class ExchangeService {
 
         Exchange exchange = Exchange.builder()
                 .requester(requester)
-                .respondent(requestedBook.getOwner())
-                .requestedBook(requestedBook)
-                .offeredBook(offeredBook)
+                .respondent(targetBook.getOwner())
+                .requestedBook(targetBook)
                 .build();
 
         return ExchangeResponse.of(exchangeRepository.save(exchange));
@@ -88,45 +74,18 @@ public class ExchangeService {
         return ExchangeResponse.of(exchange);
     }
 
-    @Transactional
-    public ExchangeResponse acceptExchange(Long userId, Long exchangeId) {
+    public List<ExchangeResponse.BookInfo> getRequesterBooks(Long userId, Long exchangeId) {
         Exchange exchange = getExchangeById(exchangeId);
-
         if (!exchange.getRespondent().getId().equals(userId)) {
             throw new PagemateException(ErrorCode.EXCHANGE_ACCESS_DENIED);
         }
-        if (exchange.getStatus() != ExchangeStatus.PENDING) {
-            throw new PagemateException(ErrorCode.BOOK_NOT_AVAILABLE);
-        }
-
-        exchange.accept();
-        exchange.getRequestedBook().updateStatus(BookStatus.IN_PROGRESS);
-        exchange.getOfferedBook().updateStatus(BookStatus.IN_PROGRESS);
-
-        // 교환 수락 시 채팅방 자동 생성
-        ChatRoom room = chatRoomRepository.findByExchangeId(exchange.getId())
-                .orElseGet(() -> {
-                    ChatRoom newRoom = chatRoomRepository.save(ChatRoom.builder()
-                            .book(exchange.getRequestedBook())
-                            .requester(exchange.getRequester())
-                            .owner(exchange.getRespondent())
-                            .exchange(exchange)
-                            .build());
-                    Message sysMsg = messageRepository.save(Message.builder()
-                            .chatRoom(newRoom)
-                            .sender(null)
-                            .content("교환이 수락되었어요. 만남 장소를 정해보세요!")
-                            .messageType(MessageType.SYSTEM)
-                            .build());
-                    newRoom.updateLastMessage(sysMsg.getContent());
-                    return newRoom;
-                });
-
-        return ExchangeResponse.of(exchange, room.getId());
+        return bookRepository.findByOwnerIdAndStatus(
+                exchange.getRequester().getId(), BookStatus.AVAILABLE
+        ).stream().map(ExchangeResponse.BookInfo::of).toList();
     }
 
     @Transactional
-    public ExchangeResponse rejectExchange(Long userId, Long exchangeId) {
+    public ExchangeResponse respondToExchange(Long userId, Long exchangeId, RespondRequest req) {
         Exchange exchange = getExchangeById(exchangeId);
 
         if (!exchange.getRespondent().getId().equals(userId)) {
@@ -136,8 +95,49 @@ public class ExchangeService {
             throw new PagemateException(ErrorCode.BOOK_NOT_AVAILABLE);
         }
 
-        exchange.reject();
-        return ExchangeResponse.of(exchange);
+        if ("ACCEPT".equals(req.getAction())) {
+            if (req.getSelectedBookId() == null) {
+                throw new PagemateException(ErrorCode.BOOK_NOT_FOUND);
+            }
+            Book selectedBook = getBook(req.getSelectedBookId());
+            if (!selectedBook.getOwner().getId().equals(exchange.getRequester().getId())) {
+                throw new PagemateException(ErrorCode.BOOK_ACCESS_DENIED);
+            }
+            if (selectedBook.getStatus() != BookStatus.AVAILABLE) {
+                throw new PagemateException(ErrorCode.BOOK_NOT_AVAILABLE);
+            }
+
+            exchange.accept(selectedBook);
+            exchange.getRequestedBook().updateStatus(BookStatus.IN_PROGRESS);
+            selectedBook.updateStatus(BookStatus.IN_PROGRESS);
+
+            ChatRoom room = chatRoomRepository.findByExchangeId(exchange.getId())
+                    .orElseGet(() -> {
+                        ChatRoom newRoom = chatRoomRepository.save(ChatRoom.builder()
+                                .book(exchange.getRequestedBook())
+                                .requester(exchange.getRequester())
+                                .owner(exchange.getRespondent())
+                                .exchange(exchange)
+                                .build());
+                        Message sysMsg = messageRepository.save(Message.builder()
+                                .chatRoom(newRoom)
+                                .sender(null)
+                                .content("교환이 수락되었어요. 만남 장소를 정해보세요!")
+                                .messageType(MessageType.SYSTEM)
+                                .build());
+                        newRoom.updateLastMessage(sysMsg.getContent());
+                        return newRoom;
+                    });
+
+            return ExchangeResponse.of(exchange, room.getId());
+
+        } else if ("REJECT".equals(req.getAction())) {
+            exchange.reject();
+            return ExchangeResponse.of(exchange);
+
+        } else {
+            throw new PagemateException(ErrorCode.VALIDATION_ERROR);
+        }
     }
 
     @Transactional
@@ -151,7 +151,9 @@ public class ExchangeService {
 
         exchange.complete();
         exchange.getRequestedBook().updateStatus(BookStatus.COMPLETED);
-        exchange.getOfferedBook().updateStatus(BookStatus.COMPLETED);
+        if (exchange.getSelectedBook() != null) {
+            exchange.getSelectedBook().updateStatus(BookStatus.COMPLETED);
+        }
         return ExchangeResponse.of(exchange);
     }
 

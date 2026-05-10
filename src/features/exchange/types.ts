@@ -20,7 +20,7 @@ export interface ExchangeUserInfo {
 export interface Exchange {
   id: number;
   requestedBook: ExchangeBookInfo;
-  offeredBook: ExchangeBookInfo;
+  selectedBook: ExchangeBookInfo | null;
   requester: ExchangeUserInfo;
   respondent: ExchangeUserInfo;
   status: ExchangeStatus;

@@ -61,8 +61,10 @@ export default function NotificationsScreen() {
     }
     if (item.type === 'CHAT_MESSAGE' && item.referenceId) {
       router.push(`/chat/${item.referenceId}`);
-    } else if (item.referenceId && item.type !== 'CHAT_MESSAGE') {
-      router.push(`/books/${item.referenceId}`);
+    } else if (item.type === 'EXCHANGE_REQUEST' && item.referenceId) {
+      router.push(`/exchanges/${item.referenceId}/respond` as any);
+    } else if (item.referenceId) {
+      router.push(`/exchanges/${item.referenceId}` as any);
     }
   };
 

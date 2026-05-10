@@ -29,15 +29,15 @@ public class Exchange {
     @JoinColumn(name = "respondent_id", nullable = false)
     private User respondent;
 
-    /** 내가 원하는 책 (상대방 소유) */
+    /** 요청자가 원하는 책 (응답자 소유) */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "requested_book_id", nullable = false)
     private Book requestedBook;
 
-    /** 내가 제안하는 책 (본인 소유) */
+    /** 응답자가 수락 시 선택한 요청자 소유 책 */
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "offered_book_id", nullable = false)
-    private Book offeredBook;
+    @JoinColumn(name = "selected_book_id")
+    private Book selectedBook;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
@@ -58,7 +58,10 @@ public class Exchange {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
-    public void accept()   { this.status = ExchangeStatus.ACCEPTED; }
+    public void accept(Book selectedBook) {
+        this.status = ExchangeStatus.ACCEPTED;
+        this.selectedBook = selectedBook;
+    }
     public void reject()   { this.status = ExchangeStatus.REJECTED; }
     public void complete() { this.status = ExchangeStatus.COMPLETED; this.completedAt = LocalDateTime.now(); }
     public void cancel()   { this.status = ExchangeStatus.CANCELLED; }

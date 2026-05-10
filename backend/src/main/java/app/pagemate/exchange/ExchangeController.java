@@ -3,6 +3,7 @@ package app.pagemate.exchange;
 import app.pagemate.common.response.ApiResponse;
 import app.pagemate.exchange.dto.ExchangeCreateRequest;
 import app.pagemate.exchange.dto.ExchangeResponse;
+import app.pagemate.exchange.dto.RespondRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -10,8 +11,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
-@RequestMapping("/v1/exchanges")
+@RequestMapping("/exchanges")
 @RequiredArgsConstructor
 public class ExchangeController {
 
@@ -40,18 +43,19 @@ public class ExchangeController {
         return ResponseEntity.ok(ApiResponse.ok(exchangeService.getExchange(userId, id)));
     }
 
-    @PatchMapping("/{id}/accept")
-    public ResponseEntity<ApiResponse<ExchangeResponse>> accept(
+    @GetMapping("/{id}/requester-books")
+    public ResponseEntity<ApiResponse<List<ExchangeResponse.BookInfo>>> getRequesterBooks(
             @AuthenticationPrincipal Long userId,
             @PathVariable Long id) {
-        return ResponseEntity.ok(ApiResponse.ok(exchangeService.acceptExchange(userId, id)));
+        return ResponseEntity.ok(ApiResponse.ok(exchangeService.getRequesterBooks(userId, id)));
     }
 
-    @PatchMapping("/{id}/reject")
-    public ResponseEntity<ApiResponse<ExchangeResponse>> reject(
+    @PatchMapping("/{id}/respond")
+    public ResponseEntity<ApiResponse<ExchangeResponse>> respond(
             @AuthenticationPrincipal Long userId,
-            @PathVariable Long id) {
-        return ResponseEntity.ok(ApiResponse.ok(exchangeService.rejectExchange(userId, id)));
+            @PathVariable Long id,
+            @Valid @RequestBody RespondRequest req) {
+        return ResponseEntity.ok(ApiResponse.ok(exchangeService.respondToExchange(userId, id, req)));
     }
 
     @PatchMapping("/{id}/complete")

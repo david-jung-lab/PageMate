@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
   Image, StyleSheet, SafeAreaView, StatusBar, ActivityIndicator,
-  Modal, FlatList, Alert,
+  Alert,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -12,11 +12,8 @@ import PMBookCover from '../../src/components/ui/PMBookCover';
 import PMBadge from '../../src/components/ui/PMBadge';
 import PMAvatar from '../../src/components/ui/PMAvatar';
 import { booksApi } from '../../src/features/books/api';
-import { profileApi } from '../../src/features/profile/api';
 import { exchangeApi } from '../../src/features/exchange/api';
 import { STATUS_LABELS } from '../../src/constants';
-import { BookSummary } from '../../src/features/books/types';
-// import { useAuthStore } from '../../src/store';
 
 const statusVariant = (s: string) => {
   if (s === 'AVAILABLE') return 'success' as const;
@@ -28,9 +25,6 @@ export default function BookDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const queryClient = useQueryClient();
-  // const myUserId = useAuthStore((s) => s.user?.id);
-  const [modalVisible, setModalVisible] = useState(false);
-  const [selectedBookId, setSelectedBookId] = useState<number | null>(null);
 
   const { data: book, isLoading } = useQuery({
     queryKey: ['book', id],
@@ -38,22 +32,10 @@ export default function BookDetailScreen() {
     enabled: !!id,
   });
 
-  const { data: myBooksData } = useQuery({
-    queryKey: ['myBooks', 'available'],
-    queryFn: () => profileApi.getMyBooks(0, 50),
-    enabled: modalVisible,
-  });
-
-  const myAvailableBooks = (myBooksData?.content ?? []).filter(
-    b => b.status === 'AVAILABLE' && b.id !== Number(id)
-  );
-
   const exchangeMutation = useMutation({
-    mutationFn: ({ offeredBookId }: { offeredBookId: number }) =>
-      exchangeApi.createExchange(Number(id), offeredBookId),
+    mutationFn: () => exchangeApi.createExchange(Number(id)),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['exchanges'] });
-      setModalVisible(false);
       Alert.alert('교환 요청 완료', '상대방의 수락을 기다려 주세요.');
     },
     onError: (err: any) => {
@@ -67,11 +49,10 @@ export default function BookDetailScreen() {
   });
 
   const handleRequestExchange = () => {
-    if (!selectedBookId) {
-      Alert.alert('책 선택', '제안할 책을 선택해 주세요.');
-      return;
-    }
-    exchangeMutation.mutate({ offeredBookId: selectedBookId });
+    Alert.alert('교환 요청', `"${book?.title}"에 교환 요청을 보내시겠어요?`, [
+      { text: '취소', style: 'cancel' },
+      { text: '요청하기', onPress: () => exchangeMutation.mutate() },
+    ]);
   };
 
   if (isLoading) {
@@ -186,104 +167,30 @@ export default function BookDetailScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* 교환 요청 버튼 — 본인 책이면 숨김 */}
-        {/* {book.owner.id !== myUserId && ( */}
-          <View style={styles.actionSection}>
-            <TouchableOpacity
-              style={[
-                styles.exchangeBtn,
-                book.status !== 'AVAILABLE' && styles.exchangeBtnDisabled,
-              ]}
-              activeOpacity={0.85}
-              disabled={book.status !== 'AVAILABLE'}
-              onPress={() => setModalVisible(true)}
-            >
-              <PMIcon name="swap" size={18} color="#fff" />
-              <Text style={styles.exchangeBtnText}>
-                {book.status === 'AVAILABLE' ? '교환 요청하기' : '교환 불가'}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        {/* )} */}
+        {/* 교환 요청 버튼 */}
+        <View style={styles.actionSection}>
+          <TouchableOpacity
+            style={[
+              styles.exchangeBtn,
+              (book.status !== 'AVAILABLE' || exchangeMutation.isPending) && styles.exchangeBtnDisabled,
+            ]}
+            activeOpacity={0.85}
+            disabled={book.status !== 'AVAILABLE' || exchangeMutation.isPending}
+            onPress={handleRequestExchange}
+          >
+            {exchangeMutation.isPending ? (
+              <ActivityIndicator color="#fff" size="small" />
+            ) : (
+              <>
+                <PMIcon name="swap" size={18} color="#fff" />
+                <Text style={styles.exchangeBtnText}>
+                  {book.status === 'AVAILABLE' ? '교환 요청하기' : '교환 불가'}
+                </Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
       </ScrollView>
-
-      {/* 교환 요청 모달 */}
-      <Modal
-        visible={modalVisible}
-        animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={() => setModalVisible(false)}
-      >
-        <SafeAreaView style={styles.modalSafe}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>제안할 책 선택</Text>
-            <TouchableOpacity onPress={() => setModalVisible(false)}>
-              <PMIcon name="close" size={22} color={colors.text} />
-            </TouchableOpacity>
-          </View>
-
-          <Text style={styles.modalSubtitle}>
-            <Text style={styles.modalBookTitle}>"{book.title}"</Text>
-            {' '}와(과) 교환할 내 책을 선택해 주세요
-          </Text>
-
-          {myAvailableBooks.length === 0 ? (
-            <View style={styles.modalEmpty}>
-              <Text style={styles.emptyText}>교환 가능한 책이 없어요</Text>
-              <Text style={styles.emptyHint}>AVAILABLE 상태인 책이 있어야 교환 요청이 가능해요</Text>
-            </View>
-          ) : (
-            <FlatList
-              data={myAvailableBooks}
-              keyExtractor={b => String(b.id)}
-              contentContainerStyle={styles.modalList}
-              renderItem={({ item }: { item: BookSummary }) => (
-                <TouchableOpacity
-                  style={[
-                    styles.bookItem,
-                    selectedBookId === item.id && styles.bookItemSelected,
-                  ]}
-                  onPress={() => setSelectedBookId(item.id)}
-                  activeOpacity={0.75}
-                >
-                  <PMBookCover
-                    title={item.title}
-                    author={item.author}
-                    color={item.coverColor}
-                    imageUrl={item.imageUrl ?? undefined}
-                    width={56}
-                    height={78}
-                  />
-                  <View style={styles.bookItemInfo}>
-                    <Text style={styles.bookItemTitle} numberOfLines={2}>{item.title}</Text>
-                    <Text style={styles.bookItemAuthor} numberOfLines={1}>{item.author}</Text>
-                  </View>
-                  {selectedBookId === item.id && (
-                    <PMIcon name="check" size={20} color={colors.primary} />
-                  )}
-                </TouchableOpacity>
-              )}
-            />
-          )}
-
-          <View style={styles.modalFooter}>
-            <TouchableOpacity
-              style={[
-                styles.confirmBtn,
-                (!selectedBookId || exchangeMutation.isPending) && styles.confirmBtnDisabled,
-              ]}
-              onPress={handleRequestExchange}
-              disabled={!selectedBookId || exchangeMutation.isPending}
-            >
-              {exchangeMutation.isPending ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={styles.confirmBtnText}>교환 요청 보내기</Text>
-              )}
-            </TouchableOpacity>
-          </View>
-        </SafeAreaView>
-      </Modal>
     </SafeAreaView>
   );
 }
@@ -416,62 +323,4 @@ const styles = StyleSheet.create({
     color: '#fff',
     letterSpacing: -0.2,
   },
-
-  // 모달
-  modalSafe: { flex: 1, backgroundColor: colors.bg },
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.s4,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  modalTitle: { fontSize: 17, fontWeight: '700', color: colors.text },
-  modalSubtitle: {
-    fontSize: 13,
-    color: colors.textSecondary,
-    paddingHorizontal: spacing.s4,
-    paddingVertical: 12,
-    lineHeight: 20,
-  },
-  modalBookTitle: { fontWeight: '700', color: colors.text },
-  modalList: { paddingHorizontal: spacing.s4, paddingBottom: 20, gap: 10 },
-  modalEmpty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 8 },
-  emptyText: { fontSize: 14, fontWeight: '600', color: colors.textSecondary },
-  emptyHint: { fontSize: 12, color: colors.textTertiary, textAlign: 'center', paddingHorizontal: 40 },
-
-  bookItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    padding: 12,
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  bookItemSelected: {
-    borderColor: colors.primary,
-    backgroundColor: colors.primarySoft,
-  },
-  bookItemInfo: { flex: 1 },
-  bookItemTitle: { fontSize: 14, fontWeight: '600', color: colors.text, lineHeight: 20 },
-  bookItemAuthor: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
-
-  modalFooter: {
-    padding: spacing.s4,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-  },
-  confirmBtn: {
-    height: 52,
-    backgroundColor: colors.primary,
-    borderRadius: radius.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  confirmBtnDisabled: { backgroundColor: colors.borderStrong },
-  confirmBtnText: { fontSize: 15, fontWeight: '700', color: '#fff' },
 });
