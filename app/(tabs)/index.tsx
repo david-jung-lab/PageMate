@@ -67,6 +67,14 @@ const ChevronRight = ({ size = 12, color = C.text2 }: { size?: number; color?: s
   </Svg>
 );
 
+const ShareIcon = () => (
+  <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+    <Path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" stroke="#FFFFFF" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+    <Path d="m16 6-4-4-4 4" stroke="#FFFFFF" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+    <Path d="M12 2v13" stroke="#FFFFFF" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+  </Svg>
+);
+
 // ─── Near book card (image + title + location) ────────────────────────────────
 const NearBookCard = ({
   title, author, imageUrl, color, neighborhood, ownerNickname, onPress,
@@ -354,6 +362,15 @@ export default function HomeScreen() {
         </View>
 
       </ScrollView>
+
+      {/* Share FAB */}
+      <TouchableOpacity
+        style={s.fab}
+        onPress={() => router.push('/shares/new')}
+        activeOpacity={0.85}
+      >
+        <ShareIcon />
+      </TouchableOpacity>
     </SafeAreaView>
   );
 }
@@ -458,4 +475,21 @@ const s = StyleSheet.create({
   quoteAuthor: { marginTop: 8, fontSize: 11, color: C.text3, letterSpacing: -0.2 },
 
   emptyText: { fontSize: 13, color: C.text3, paddingHorizontal: 20, paddingVertical: 8 },
+
+  fab: {
+    position: 'absolute',
+    bottom: 24,
+    right: 20,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: C.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: C.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    elevation: 8,
+  },
 });
