@@ -63,6 +63,10 @@ export default function NotificationsScreen() {
       router.push(`/chat/${item.referenceId}`);
     } else if (item.type === 'EXCHANGE_REQUEST' && item.referenceId) {
       router.push(`/exchanges/${item.referenceId}/respond` as any);
+    } else if (item.type === 'EXCHANGE_ACCEPTED' && item.referenceId) {
+      router.push(`/exchanges/${item.referenceId}/agreement` as any);
+    } else if (item.type === 'EXCHANGE_COMPLETED' && item.referenceId) {
+      router.push(`/exchanges/${item.referenceId}/review` as any);
     } else if (item.referenceId) {
       router.push(`/exchanges/${item.referenceId}` as any);
     }

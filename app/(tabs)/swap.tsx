@@ -63,7 +63,10 @@ export default function SwapScreen() {
 
   const completeSecondMutation = useMutation({
     mutationFn: exchangeApi.completeSecondExchange,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['exchanges'] }),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['exchanges'] });
+      router.push(`/exchanges/${data.id}/review` as any);
+    },
     onError: () => Alert.alert('오류', '반납 완료 처리에 실패했어요.'),
   });
 
