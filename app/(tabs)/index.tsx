@@ -575,8 +575,8 @@ export default function HomeScreen() {
 
   const { data: nearBooks, isLoading: nearLoading } = useQuery({
     queryKey: ['books', 'near', neighborhoodName],
-    queryFn: () => booksApi.getBooks({ sort: 'LATEST', size: 8, neighborhood: neighborhoodName ?? undefined }),
-    enabled: !profileLoading,
+    queryFn: () => booksApi.getBooks({ sort: 'LATEST', size: 8, neighborhood: neighborhoodName! }),
+    enabled: !profileLoading && !!neighborhoodName,
   });
 
   const { data: recentBooks, isLoading: recentLoading } = useQuery({
@@ -658,7 +658,7 @@ export default function HomeScreen() {
             sub="2km 내 독자들이 내놓은 책"
             onMore={() => router.push('/search')}
           />
-          {!location && !profileLoading && (
+          {!location && !profileLoading ? (
             <TouchableOpacity
               style={s.locationBanner}
               onPress={() => setShowNeighborhoodSheet(true)}
@@ -671,8 +671,7 @@ export default function HomeScreen() {
               </View>
               <ChevronRight size={14} color={C.primary} />
             </TouchableOpacity>
-          )}
-          {nearLoading ? (
+          ) : nearLoading ? (
             <ActivityIndicator style={{ marginVertical: 32 }} color={C.primary} />
           ) : nearBooks?.content.length ? (
             <ScrollView
