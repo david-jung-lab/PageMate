@@ -15,6 +15,7 @@ import { useQuery } from '@tanstack/react-query';
 import Svg, { Path, Circle } from 'react-native-svg';
 import { booksApi } from '../../src/features/books/api';
 import { exchangeApi } from '../../src/features/exchange/api';
+import { profileApi } from '../../src/features/profile/api';
 import { CoverColor } from '../../src/features/books/types';
 import { Exchange } from '../../src/features/exchange/types';
 import { useAuthStore } from '../../src/store';
@@ -177,8 +178,10 @@ const NearBookCard = ({
         <Text style={nearCardSt.title} numberOfLines={1}>{title}</Text>
         <Text style={nearCardSt.author} numberOfLines={1}>{author}</Text>
         <View style={nearCardSt.locRow}>
-          <PinIcon size={10} color={C.text3} />
-          <Text style={nearCardSt.locText}>{neighborhood ?? '위치 미설정'} · {ownerNickname}</Text>
+          <View style={nearCardSt.pinWrapper}>
+            <PinIcon size={10} color={C.text3} />
+          </View>
+          <Text style={nearCardSt.locText} numberOfLines={2}>{neighborhood ?? '위치 미설정'} · {ownerNickname}</Text>
         </View>
       </View>
     </TouchableOpacity>
@@ -237,8 +240,9 @@ const nearCardSt = StyleSheet.create({
   meta: { paddingHorizontal: 14, paddingTop: 12, paddingBottom: 14, gap: 4 },
   title: { fontSize: 14, fontWeight: '700', color: C.text, letterSpacing: -0.3 },
   author: { fontSize: 12, color: C.text2, letterSpacing: -0.2, marginBottom: 2 },
-  locRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  locText: { fontSize: 12, color: C.text3 },
+  locRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 4 },
+  pinWrapper: { marginTop: 2 },
+  locText: { fontSize: 12, color: C.text3, flex: 1, lineHeight: 17 },
 });
 
 // ─── Recent book cover (square image) ────────────────────────────────────────
@@ -311,7 +315,15 @@ function formatTime(iso: string): string {
 export default function HomeScreen() {
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
-  const nickname = user?.nickname ?? '독자';
+
+  const { data: profile } = useQuery({
+    queryKey: ['profile', 'me'],
+    queryFn: () => profileApi.getMyProfile(),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const nickname = profile?.nickname ?? user?.nickname ?? '독자';
+  const location = profile?.location ?? null;
 
   const { data: nearBooks, isLoading: nearLoading } = useQuery({
     queryKey: ['books', 'near'],
@@ -354,10 +366,12 @@ export default function HomeScreen() {
             <Text style={s.accent}>오늘의 책</Text>
             {'을 만나보세요'}
           </Text>
-          <View style={s.locRow}>
-            <PinIcon />
-            <Text style={s.locText}>망원동 · 반경 2km · 독자 184명</Text>
-          </View>
+          {location && (
+            <View style={s.locRow}>
+              <PinIcon />
+              <Text style={s.locText}>{location}</Text>
+            </View>
+          )}
         </View>
 
         {/* 진행 중인 교환독서 */}
