@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { router } from 'expo-router';
 import { API_BASE_URL } from '../constants';
 import { useAuthStore } from '../store';
 import { storage } from './storage';
@@ -35,6 +36,7 @@ api.interceptors.response.use(
         return api(original);
       } catch {
         await useAuthStore.getState().clearAuth();
+        router.replace('/(auth)/login');
       }
     }
     return Promise.reject(error);

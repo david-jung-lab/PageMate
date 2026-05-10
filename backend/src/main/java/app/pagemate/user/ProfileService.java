@@ -8,6 +8,9 @@ import app.pagemate.book.BookQueryRepository;
 import app.pagemate.common.exception.ErrorCode;
 import app.pagemate.common.exception.PagemateException;
 import app.pagemate.common.service.S3Service;
+import app.pagemate.exchange.ExchangeRepository;
+import app.pagemate.exchange.ExchangeStatus;
+import app.pagemate.review.ReviewRepository;
 import app.pagemate.user.dto.OnboardRequest;
 import app.pagemate.user.dto.ProfileResponse;
 import app.pagemate.user.dto.ProfileUpdateRequest;
@@ -27,12 +30,13 @@ public class ProfileService {
     private final BookRepository bookRepository;
     private final BookQueryRepository bookQueryRepository;
     private final S3Service s3Service;
+    private final ReviewRepository reviewRepository;
+    private final ExchangeRepository exchangeRepository;
 
     public ProfileResponse getMyProfile(Long userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new PagemateException(ErrorCode.USER_NOT_FOUND));
-        int bookCount = bookRepository.countByOwnerId(userId);
-        return ProfileResponse.of(user, bookCount);
+        return buildProfileResponse(user, userId);
     }
 
     @Transactional
@@ -64,8 +68,7 @@ public class ProfileService {
                 imageUrl
         );
 
-        int bookCount = bookRepository.countByOwnerId(userId);
-        return ProfileResponse.of(user, bookCount);
+        return buildProfileResponse(user, userId);
     }
 
     @Transactional
@@ -89,8 +92,7 @@ public class ProfileService {
                 null
         );
 
-        int bookCount = bookRepository.countByOwnerId(userId);
-        return ProfileResponse.of(user, bookCount);
+        return buildProfileResponse(user, userId);
     }
 
     @Transactional
@@ -103,8 +105,7 @@ public class ProfileService {
     public ProfileResponse getUserProfile(Long targetId) {
         User user = userRepository.findById(targetId)
                 .orElseThrow(() -> new PagemateException(ErrorCode.USER_NOT_FOUND));
-        int bookCount = bookRepository.countByOwnerId(targetId);
-        return ProfileResponse.of(user, bookCount);
+        return buildProfileResponse(user, targetId);
     }
 
     public BookPageResponse<BookSummaryResponse> getUserBooks(Long targetId, int page, int size) {
@@ -115,5 +116,13 @@ public class ProfileService {
                 bookQueryRepository.findMyBooks(targetId, BookStatus.AVAILABLE, PageRequest.of(page, size)),
                 b -> BookSummaryResponse.of(b)
         );
+    }
+
+    private ProfileResponse buildProfileResponse(User user, Long userId) {
+        int bookCount = bookRepository.countByOwnerId(userId);
+        int exchangeCount = (int) exchangeRepository.countByUserIdAndStatus(userId, ExchangeStatus.COMPLETED);
+        double averageRating = reviewRepository.averageRatingByRevieweeId(userId);
+        int reviewCount = (int) reviewRepository.countByRevieweeId(userId);
+        return ProfileResponse.of(user, bookCount, exchangeCount, averageRating, reviewCount);
     }
 }

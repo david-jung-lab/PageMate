@@ -302,9 +302,9 @@ export default function ProfileEditScreen() {
         <Text style={styles.sectionLabel}>취향 태그</Text>
         <View style={styles.tagsWrap}>
           {GENRES.map(g => (
-            <TouchableOpacity key={g} onPress={() => toggleTag(g)} activeOpacity={0.7}>
-              <PMBadge variant={tags.includes(g) ? 'primary' : 'default'} size="md">
-                #{g}
+            <TouchableOpacity key={g.id} onPress={() => toggleTag(g.id)} activeOpacity={0.7}>
+              <PMBadge variant={tags.includes(g.id) ? 'primary' : 'default'} size="md">
+                #{g.label}
               </PMBadge>
             </TouchableOpacity>
           ))}

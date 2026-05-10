@@ -3,6 +3,7 @@ package app.pagemate.review;
 import app.pagemate.common.response.ApiResponse;
 import app.pagemate.review.dto.ReviewCreateRequest;
 import app.pagemate.review.dto.ReviewResponse;
+import app.pagemate.review.dto.UserReviewsResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -10,13 +11,12 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/exchanges/{exchangeId}/review")
 @RequiredArgsConstructor
 public class ReviewController {
 
     private final ReviewService reviewService;
 
-    @PostMapping
+    @PostMapping("/exchanges/{exchangeId}/reviews")
     public ResponseEntity<ApiResponse<ReviewResponse>> create(
             @AuthenticationPrincipal Long userId,
             @PathVariable Long exchangeId,
@@ -24,10 +24,16 @@ public class ReviewController {
         return ResponseEntity.ok(ApiResponse.ok(reviewService.createReview(userId, exchangeId, req)));
     }
 
-    @GetMapping("/status")
+    @GetMapping("/exchanges/{exchangeId}/reviews/status")
     public ResponseEntity<ApiResponse<Boolean>> hasReviewed(
             @AuthenticationPrincipal Long userId,
             @PathVariable Long exchangeId) {
         return ResponseEntity.ok(ApiResponse.ok(reviewService.hasReviewed(userId, exchangeId)));
+    }
+
+    @GetMapping("/v1/users/{userId}/reviews")
+    public ResponseEntity<ApiResponse<UserReviewsResponse>> getUserReviews(
+            @PathVariable Long userId) {
+        return ResponseEntity.ok(ApiResponse.ok(reviewService.getUserReviews(userId)));
     }
 }

@@ -3,6 +3,9 @@ package app.pagemate.book;
 import app.pagemate.book.dto.*;
 import app.pagemate.common.exception.ErrorCode;
 import app.pagemate.common.exception.PagemateException;
+import app.pagemate.exchange.ExchangeRepository;
+import app.pagemate.exchange.ExchangeStatus;
+import app.pagemate.review.ReviewRepository;
 import app.pagemate.user.User;
 import app.pagemate.user.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +22,8 @@ public class BookService {
     private final BookRepository bookRepository;
     private final BookQueryRepository bookQueryRepository;
     private final UserRepository userRepository;
+    private final ReviewRepository reviewRepository;
+    private final ExchangeRepository exchangeRepository;
 
     @Transactional
     public BookDetailResponse createBook(Long userId, BookCreateRequest req) {
@@ -39,8 +44,7 @@ public class BookService {
                 .build();
 
         bookRepository.save(book);
-        int bookCount = bookRepository.countByOwnerId(owner.getId());
-        return BookDetailResponse.of(book, bookCount, 0);
+        return buildBookDetailResponse(book, owner.getId());
     }
 
     public BookPageResponse<BookSummaryResponse> getBooks(
@@ -53,9 +57,7 @@ public class BookService {
     public BookDetailResponse getBook(Long bookId) {
         Book book = bookRepository.findById(bookId)
                 .orElseThrow(() -> new PagemateException(ErrorCode.BOOK_NOT_FOUND));
-
-        int bookCount = bookRepository.countByOwnerId(book.getOwner().getId());
-        return BookDetailResponse.of(book, bookCount, 0);
+        return buildBookDetailResponse(book, book.getOwner().getId());
     }
 
     @Transactional
@@ -68,8 +70,7 @@ public class BookService {
         }
 
         book.update(req.description(), req.coverColor());
-        int bookCount = bookRepository.countByOwnerId(userId);
-        return BookDetailResponse.of(book, bookCount, 0);
+        return buildBookDetailResponse(book, userId);
     }
 
     @Transactional
@@ -87,5 +88,13 @@ public class BookService {
     public BookPageResponse<BookSummaryResponse> getMyBooks(Long userId, BookStatus status, int page, int size) {
         Page<Book> bookPage = bookQueryRepository.findMyBooks(userId, status, PageRequest.of(page, size));
         return BookPageResponse.of(bookPage, BookSummaryResponse::of);
+    }
+
+    private BookDetailResponse buildBookDetailResponse(Book book, Long ownerId) {
+        int bookCount = bookRepository.countByOwnerId(ownerId);
+        int exchangeCount = (int) exchangeRepository.countByUserIdAndStatus(ownerId, ExchangeStatus.COMPLETED);
+        double averageRating = reviewRepository.averageRatingByRevieweeId(ownerId);
+        int reviewCount = (int) reviewRepository.countByRevieweeId(ownerId);
+        return BookDetailResponse.of(book, bookCount, exchangeCount, averageRating, reviewCount);
     }
 }

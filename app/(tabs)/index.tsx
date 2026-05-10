@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -9,16 +9,23 @@ import {
   SafeAreaView,
   StatusBar,
   ActivityIndicator,
+  Modal,
+  Pressable,
+  Platform,
+  TextInput,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Svg, { Path, Circle } from 'react-native-svg';
 import { booksApi } from '../../src/features/books/api';
 import { exchangeApi } from '../../src/features/exchange/api';
 import { profileApi } from '../../src/features/profile/api';
+import { locationApi, LocationResult } from '../../src/features/locations/api';
 import { CoverColor } from '../../src/features/books/types';
 import { Exchange } from '../../src/features/exchange/types';
-import { useAuthStore } from '../../src/store';
+import { storage } from '../../src/lib/storage';
+import { GENRES } from '../../src/constants';
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 const C = {
@@ -181,7 +188,7 @@ const NearBookCard = ({
           <View style={nearCardSt.pinWrapper}>
             <PinIcon size={10} color={C.text3} />
           </View>
-          <Text style={nearCardSt.locText} numberOfLines={2}>{neighborhood ?? '위치 미설정'} · {ownerNickname}</Text>
+          <Text style={nearCardSt.locText} numberOfLines={1}>{(neighborhood ?? '위치 미설정').split(' · ')[0]} · {ownerNickname}</Text>
         </View>
       </View>
     </TouchableOpacity>
@@ -311,23 +318,265 @@ function formatTime(iso: string): string {
   return `${Math.floor(hr / 24)}일 전`;
 }
 
+// ─── Neighborhood bottom sheet ────────────────────────────────────────────────
+const NeighborhoodSheet = ({
+  visible, onClose, onSelect,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  onSelect: (loc: string) => void;
+}) => {
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState<LocationResult[]>([]);
+  const [searching, setSearching] = useState(false);
+  const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (!query.trim()) { setResults([]); return; }
+    if (debounce.current) clearTimeout(debounce.current);
+    debounce.current = setTimeout(async () => {
+      setSearching(true);
+      try { setResults((await locationApi.search(query.trim())) ?? []); }
+      catch { setResults([]); }
+      finally { setSearching(false); }
+    }, 350);
+    return () => { if (debounce.current) clearTimeout(debounce.current); };
+  }, [query]);
+
+  const handlePick = async (r: LocationResult) => {
+    const label = r.district ? `${r.name} · ${r.district}` : r.name;
+    try { await profileApi.updateMyProfile({ location: label }); } catch {}
+    onSelect(label);
+    setQuery('');
+    setResults([]);
+  };
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <Pressable style={nbrSt.overlay} onPress={onClose} />
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <View style={nbrSt.sheet}>
+          <View style={nbrSt.handle} />
+          <Text style={nbrSt.title}>동네 설정</Text>
+          <Text style={nbrSt.subtitle}>내 주변 책을 보려면 동네를 설정해주세요</Text>
+          <View style={nbrSt.searchRow}>
+            <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
+              <Circle cx={11} cy={11} r={7} stroke={C.text3} strokeWidth={2} />
+              <Path d="m20 20-3.5-3.5" stroke={C.text3} strokeWidth={2} strokeLinecap="round" />
+            </Svg>
+            <TextInput
+              style={nbrSt.searchInput}
+              value={query}
+              onChangeText={setQuery}
+              placeholder="동 이름으로 검색 (예: 망원동)"
+              placeholderTextColor={C.text3}
+              autoFocus
+              autoCorrect={false}
+            />
+            {searching && <ActivityIndicator size="small" color={C.primary} />}
+          </View>
+          {results.length > 0 && (
+            <View style={nbrSt.resultList}>
+              {results.map((r, i) => (
+                <TouchableOpacity
+                  key={`${r.fullAddress}-${i}`}
+                  style={[nbrSt.resultItem, i > 0 && nbrSt.resultBorder]}
+                  onPress={() => handlePick(r)}
+                  activeOpacity={0.75}
+                >
+                  <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
+                    <Path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" stroke={C.primary} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                    <Circle cx={12} cy={10} r={3} stroke={C.primary} strokeWidth={2} />
+                  </Svg>
+                  <View style={{ flex: 1 }}>
+                    <Text style={nbrSt.resultName}>{r.name}</Text>
+                    {r.district && <Text style={nbrSt.resultSub}>{r.district} · {r.city}</Text>}
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+          {!searching && query.trim().length > 0 && results.length === 0 && (
+            <Text style={nbrSt.empty}>검색 결과가 없어요</Text>
+          )}
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+};
+
+const nbrSt = StyleSheet.create({
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' },
+  sheet: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 24,
+    paddingTop: 12,
+    paddingBottom: Platform.OS === 'ios' ? 40 : 24,
+    gap: 12,
+  },
+  handle: { width: 40, height: 4, backgroundColor: C.line, borderRadius: 2, alignSelf: 'center', marginBottom: 4 },
+  title: { fontSize: 18, fontWeight: '700', color: C.text, letterSpacing: -0.3 },
+  subtitle: { fontSize: 13, color: C.text2, marginTop: -4 },
+  searchRow: {
+    height: 48, paddingHorizontal: 14, backgroundColor: C.bg,
+    borderWidth: 1.5, borderColor: C.line, borderRadius: 12,
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+  },
+  searchInput: { flex: 1, fontSize: 14, color: C.text, padding: 0 },
+  resultList: {
+    backgroundColor: C.card, borderWidth: 1, borderColor: C.line,
+    borderRadius: 12, overflow: 'hidden',
+  },
+  resultItem: { height: 56, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  resultBorder: { borderTopWidth: 1, borderTopColor: C.line },
+  resultName: { fontSize: 14, fontWeight: '600', color: C.text },
+  resultSub: { fontSize: 12, color: C.text3, marginTop: 1 },
+  empty: { fontSize: 13, color: C.text3, textAlign: 'center', paddingVertical: 12 },
+});
+
+// ─── Genre bottom sheet ───────────────────────────────────────────────────────
+const GenreBottomSheet = ({
+  visible,
+  onDone,
+}: {
+  visible: boolean;
+  onDone: (genres: string[]) => void;
+}) => {
+  const [selected, setSelected] = useState(new Set<string>());
+
+  const toggle = useCallback((id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }, []);
+
+  return (
+    <Modal visible={visible} transparent animationType="slide">
+      <View style={genreSheetSt.overlay}>
+        <View style={genreSheetSt.sheet}>
+          <View style={genreSheetSt.handle} />
+          <Text style={genreSheetSt.title}>취향에 맞는 책을 보여드릴게요</Text>
+          <Text style={genreSheetSt.subtitle}>좋아하는 장르를 선택해주세요 (복수 선택 가능)</Text>
+
+          <View style={genreSheetSt.grid}>
+            {GENRES.map((g) => {
+              const sel = selected.has(g.id);
+              return (
+                <Pressable
+                  key={g.id}
+                  onPress={() => toggle(g.id)}
+                  style={[genreSheetSt.tag, sel && genreSheetSt.tagSelected]}
+                >
+                  <Text style={[genreSheetSt.tagLabel, sel && genreSheetSt.tagLabelSelected]}>
+                    {g.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          <Pressable
+            onPress={() => onDone(Array.from(selected))}
+            style={[genreSheetSt.doneBtn, selected.size === 0 && genreSheetSt.doneBtnDisabled]}
+          >
+            <Text style={genreSheetSt.doneBtnLabel}>완료</Text>
+          </Pressable>
+        </View>
+      </View>
+    </Modal>
+  );
+};
+
+const genreSheetSt = StyleSheet.create({
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
+  sheet: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 24,
+    paddingTop: 12,
+    paddingBottom: Platform.OS === 'ios' ? 40 : 28,
+    gap: 16,
+  },
+  handle: { width: 40, height: 4, backgroundColor: '#E5E7EB', borderRadius: 2, alignSelf: 'center', marginBottom: 4 },
+  title: { fontSize: 18, fontWeight: '700', color: '#1A1A2E', letterSpacing: -0.3 },
+  subtitle: { fontSize: 13, color: '#6B7280', letterSpacing: -0.1, marginTop: -8 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  tag: {
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: '#1A1A2E',
+    backgroundColor: '#FFFFFF',
+  },
+  tagSelected: {
+    backgroundColor: '#1A1A2E',
+  },
+  tagLabel: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1A1A2E',
+    letterSpacing: -0.2,
+  },
+  tagLabelSelected: {
+    color: '#FFFFFF',
+  },
+  doneBtn: {
+    height: 52,
+    borderRadius: 14,
+    backgroundColor: '#4F86C6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 4,
+  },
+  doneBtnDisabled: { backgroundColor: '#C8D5E7' },
+  doneBtnLabel: { fontSize: 16, fontWeight: '700', color: '#FFFFFF', letterSpacing: -0.2 },
+});
+
 // ─── Screen ───────────────────────────────────────────────────────────────────
 export default function HomeScreen() {
   const router = useRouter();
-  const user = useAuthStore((s) => s.user);
+  const queryClient = useQueryClient();
+  const [showGenreSheet, setShowGenreSheet] = useState(false);
+  const [showNeighborhoodSheet, setShowNeighborhoodSheet] = useState(false);
 
-  const { data: profile } = useQuery({
+  const { data: profile, isLoading: profileLoading } = useQuery({
     queryKey: ['profile', 'me'],
     queryFn: () => profileApi.getMyProfile(),
     staleTime: 5 * 60 * 1000,
   });
 
-  const nickname = profile?.nickname ?? user?.nickname ?? '독자';
+  useEffect(() => {
+    storage.getGenrePending().then((pending) => {
+      if (pending === 'true') setShowGenreSheet(true);
+    });
+  }, []);
+
+  const handleGenreDone = useCallback(async (genres: string[]) => {
+    try {
+      if (genres.length > 0) {
+        await profileApi.updateMyProfile({ tags: genres });
+        queryClient.invalidateQueries({ queryKey: ['profile', 'me'] });
+      }
+      await storage.clearGenrePending();
+    } catch {}
+    setShowGenreSheet(false);
+  }, [queryClient]);
+
+  const nickname = profileLoading ? '' : (profile?.nickname ?? '독자');
   const location = profile?.location ?? null;
+  // "신장동 · 하남시" → "신장동"
+  const neighborhoodName = location ? location.split(' · ')[0].trim() : null;
 
   const { data: nearBooks, isLoading: nearLoading } = useQuery({
-    queryKey: ['books', 'near'],
-    queryFn: () => booksApi.getBooks({ sort: 'LATEST', size: 8 }),
+    queryKey: ['books', 'near', neighborhoodName],
+    queryFn: () => booksApi.getBooks({ sort: 'LATEST', size: 8, neighborhood: neighborhoodName ?? undefined }),
+    enabled: !profileLoading,
   });
 
   const { data: recentBooks, isLoading: recentLoading } = useQuery({
@@ -359,13 +608,17 @@ export default function HomeScreen() {
 
         {/* Greeting */}
         <View style={s.greeting}>
-          <Text style={s.greetText}>
-            {'안녕하세요, '}
-            <Text style={s.accent}>{nickname}</Text>
-            {'님\n'}
-            <Text style={s.accent}>오늘의 책</Text>
-            {'을 만나보세요'}
-          </Text>
+          {nickname ? (
+            <Text style={s.greetText}>
+              {'안녕하세요, '}
+              <Text style={s.accent}>{nickname}</Text>
+              {'님\n'}
+              <Text style={s.accent}>오늘의 책</Text>
+              {'을 만나보세요'}
+            </Text>
+          ) : (
+            <View style={s.greetSkeleton} />
+          )}
           {location && (
             <View style={s.locRow}>
               <PinIcon />
@@ -405,6 +658,20 @@ export default function HomeScreen() {
             sub="2km 내 독자들이 내놓은 책"
             onMore={() => router.push('/search')}
           />
+          {!location && !profileLoading && (
+            <TouchableOpacity
+              style={s.locationBanner}
+              onPress={() => setShowNeighborhoodSheet(true)}
+              activeOpacity={0.8}
+            >
+              <PinIcon size={16} color={C.primary} />
+              <View style={{ flex: 1 }}>
+                <Text style={s.locationBannerTitle}>동네를 설정하세요</Text>
+                <Text style={s.locationBannerSub}>내 주변 책을 보려면 동네 설정이 필요해요</Text>
+              </View>
+              <ChevronRight size={14} color={C.primary} />
+            </TouchableOpacity>
+          )}
           {nearLoading ? (
             <ActivityIndicator style={{ marginVertical: 32 }} color={C.primary} />
           ) : nearBooks?.content.length ? (
@@ -481,6 +748,17 @@ export default function HomeScreen() {
       >
         <ShareIcon />
       </TouchableOpacity>
+
+      <GenreBottomSheet visible={showGenreSheet} onDone={handleGenreDone} />
+
+      <NeighborhoodSheet
+        visible={showNeighborhoodSheet}
+        onClose={() => setShowNeighborhoodSheet(false)}
+        onSelect={() => {
+          queryClient.invalidateQueries({ queryKey: ['profile', 'me'] });
+          setShowNeighborhoodSheet(false);
+        }}
+      />
     </SafeAreaView>
   );
 }
@@ -512,6 +790,7 @@ const s = StyleSheet.create({
   },
 
   greeting: { paddingHorizontal: 20, paddingTop: 4, gap: 8 },
+  greetSkeleton: { height: 64, borderRadius: 8, backgroundColor: '#ECEEF2', width: '70%' },
   greetText: {
     fontSize: 22,
     fontFamily: 'NotoSerifKR_700Bold',
@@ -585,6 +864,21 @@ const s = StyleSheet.create({
   quoteAuthor: { marginTop: 8, fontSize: 11, color: C.text3, letterSpacing: -0.2 },
 
   emptyText: { fontSize: 13, color: C.text3, paddingHorizontal: 20, paddingVertical: 8 },
+
+  locationBanner: {
+    marginHorizontal: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: '#EEF2FF',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderWidth: 1,
+    borderColor: '#C7D5FA',
+  },
+  locationBannerTitle: { fontSize: 14, fontWeight: '700', color: C.primary, letterSpacing: -0.2 },
+  locationBannerSub: { fontSize: 12, color: C.text2, marginTop: 2, letterSpacing: -0.1 },
 
   fab: {
     position: 'absolute',

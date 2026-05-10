@@ -88,12 +88,12 @@ export default function SearchScreen() {
             </TouchableOpacity>
             {GENRES.map((g) => (
               <TouchableOpacity
-                key={g}
-                style={[styles.chip, selectedGenre === g && styles.chipActive]}
-                onPress={() => setSelectedGenre(selectedGenre === g ? undefined : g)}
+                key={g.id}
+                style={[styles.chip, selectedGenre === g.id && styles.chipActive]}
+                onPress={() => setSelectedGenre(selectedGenre === g.id ? undefined : g.id)}
                 activeOpacity={0.75}
               >
-                <Text style={[styles.chipText, selectedGenre === g && styles.chipTextActive]}>{g}</Text>
+                <Text style={[styles.chipText, selectedGenre === g.id && styles.chipTextActive]}>{g.label}</Text>
               </TouchableOpacity>
             ))}
           </ScrollView>

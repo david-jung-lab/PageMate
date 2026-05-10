@@ -23,4 +23,7 @@ public interface ExchangeRepository extends JpaRepository<Exchange, Long> {
             @Param("userId") Long userId,
             @Param("status") ExchangeStatus status,
             Pageable pageable);
+
+    @Query("SELECT COUNT(e) FROM Exchange e WHERE (e.requester.id = :userId OR e.respondent.id = :userId) AND e.status = :status")
+    long countByUserIdAndStatus(@Param("userId") Long userId, @Param("status") ExchangeStatus status);
 }

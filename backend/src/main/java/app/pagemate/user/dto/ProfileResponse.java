@@ -15,9 +15,12 @@ public record ProfileResponse(
         String location,
         List<String> tags,
         int bookCount,
+        int exchangeCount,
+        double averageRating,
+        int reviewCount,
         LocalDateTime createdAt
 ) {
-    public static ProfileResponse of(User user, int bookCount) {
+    public static ProfileResponse of(User user, int bookCount, int exchangeCount, double averageRating, int reviewCount) {
         return new ProfileResponse(
                 user.getId(),
                 user.getNickname(),
@@ -28,6 +31,9 @@ public record ProfileResponse(
                 user.getLocation(),
                 user.getTags(),
                 bookCount,
+                exchangeCount,
+                averageRating,
+                reviewCount,
                 user.getCreatedAt()
         );
     }

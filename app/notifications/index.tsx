@@ -25,6 +25,13 @@ const TYPE_ICON: Record<NotificationType, 'swap' | 'chat'> = {
   CHAT_MESSAGE: 'chat',
 };
 
+type Tab = 'all' | 'exchange' | 'message' | 'system';
+
+const EXCHANGE_TYPES: NotificationType[] = [
+  'EXCHANGE_REQUEST', 'EXCHANGE_ACCEPTED', 'EXCHANGE_REJECTED', 'EXCHANGE_COMPLETED',
+];
+const MESSAGE_TYPES: NotificationType[] = ['CHAT_MESSAGE'];
+
 function timeAgo(dateStr: string) {
   const diff = Date.now() - new Date(dateStr).getTime();
   const m = Math.floor(diff / 60000);
@@ -35,10 +42,18 @@ function timeAgo(dateStr: string) {
   return `${Math.floor(h / 24)}일 전`;
 }
 
+function filterByTab(items: NotificationItem[], tab: Tab): NotificationItem[] {
+  if (tab === 'exchange') return items.filter(n => EXCHANGE_TYPES.includes(n.type));
+  if (tab === 'message') return items.filter(n => MESSAGE_TYPES.includes(n.type));
+  if (tab === 'system') return items.filter(n => !EXCHANGE_TYPES.includes(n.type) && !MESSAGE_TYPES.includes(n.type));
+  return items;
+}
+
 export default function NotificationsScreen() {
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [tab, setTab] = useState<Tab>('all');
 
   const load = useCallback(async () => {
     try {
@@ -77,6 +92,16 @@ export default function NotificationsScreen() {
     setItems(prev => prev.map(n => ({ ...n, isRead: true })));
   };
 
+  const displayed = filterByTab(items, tab);
+  const hasUnread = items.some(n => !n.isRead);
+
+  const TABS: { key: Tab; label: string }[] = [
+    { key: 'all', label: '전체' },
+    { key: 'exchange', label: '교환' },
+    { key: 'message', label: '메시지' },
+    { key: 'system', label: '시스템' },
+  ];
+
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
@@ -84,7 +109,7 @@ export default function NotificationsScreen() {
           <PMIcon name="chevronLeft" size={24} color={colors.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>알림</Text>
-        {items.some(n => !n.isRead) ? (
+        {hasUnread ? (
           <TouchableOpacity onPress={handleMarkAll} activeOpacity={0.7}>
             <Text style={styles.markAllBtn}>모두 읽음</Text>
           </TouchableOpacity>
@@ -93,14 +118,28 @@ export default function NotificationsScreen() {
         )}
       </View>
 
+      {/* 탭 */}
+      <View style={styles.tabRow}>
+        {TABS.map(t => (
+          <TouchableOpacity
+            key={t.key}
+            style={[styles.tab, tab === t.key && styles.tabActive]}
+            onPress={() => setTab(t.key)}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.tabText, tab === t.key && styles.tabTextActive]}>{t.label}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
       {loading ? (
         <ActivityIndicator style={{ flex: 1 }} color={colors.primary} />
       ) : (
         <FlatList
-          data={items}
+          data={displayed}
           keyExtractor={item => String(item.id)}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} />}
-          contentContainerStyle={items.length === 0 && styles.emptyContainer}
+          contentContainerStyle={displayed.length === 0 ? styles.emptyContainer : undefined}
           ListEmptyComponent={
             <Text style={styles.emptyText}>알림이 없어요</Text>
           }
@@ -111,6 +150,7 @@ export default function NotificationsScreen() {
               onPress={() => handlePress(item)}
               activeOpacity={0.7}
             >
+              {!item.isRead && <View style={styles.unreadIndicator} />}
               <View style={[styles.iconWrap, !item.isRead && styles.iconWrapUnread]}>
                 <PMIcon
                   name={TYPE_ICON[item.type]}
@@ -119,7 +159,9 @@ export default function NotificationsScreen() {
                 />
               </View>
               <View style={styles.itemBody}>
-                <Text style={styles.itemType}>{TYPE_LABEL[item.type]}</Text>
+                <Text style={[styles.itemType, item.isRead && styles.itemTypeRead]}>
+                  {TYPE_LABEL[item.type]}
+                </Text>
                 <Text style={styles.itemContent} numberOfLines={2}>{item.content}</Text>
                 <Text style={styles.itemTime}>{timeAgo(item.createdAt)}</Text>
               </View>
@@ -142,12 +184,46 @@ const styles = StyleSheet.create({
   backBtn: { width: 36, alignItems: 'flex-start' },
   headerTitle: { fontSize: 16, fontWeight: '700', letterSpacing: -0.3, color: colors.text },
   markAllBtn: { fontSize: 13, fontWeight: '600', color: colors.primary, width: 60, textAlign: 'right' },
+
+  // 탭
+  tabRow: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    paddingHorizontal: spacing.s4,
+  },
+  tab: {
+    paddingVertical: 12,
+    paddingHorizontal: 4,
+    marginRight: 20,
+  },
+  tabActive: {
+    borderBottomWidth: 2,
+    borderBottomColor: colors.primary,
+  },
+  tabText: { fontSize: 14, fontWeight: '600', color: colors.textTertiary },
+  tabTextActive: { color: colors.primary },
+
+  // 알림 아이템
   item: {
-    flexDirection: 'row', alignItems: 'flex-start', gap: 12,
-    paddingHorizontal: spacing.s4, paddingVertical: 14,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+    paddingHorizontal: spacing.s4,
+    paddingVertical: 14,
     backgroundColor: colors.bg,
+    position: 'relative',
   },
   itemUnread: { backgroundColor: colors.primarySoft },
+  // 좌측 파란 인디케이터 (설계서 SCR-018: 좌측 #4F86C6 3px)
+  unreadIndicator: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 3,
+    backgroundColor: colors.primary,
+  },
   iconWrap: {
     width: 40, height: 40, borderRadius: radius.full,
     backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center',
@@ -156,6 +232,7 @@ const styles = StyleSheet.create({
   iconWrapUnread: { backgroundColor: colors.primarySoft, borderColor: colors.primary },
   itemBody: { flex: 1 },
   itemType: { fontSize: 11, fontWeight: '700', color: colors.primary, marginBottom: 2 },
+  itemTypeRead: { color: colors.textTertiary },
   itemContent: { fontSize: 13, color: colors.text, lineHeight: 18, letterSpacing: -0.1 },
   itemTime: { fontSize: 11, color: colors.textTertiary, marginTop: 4 },
   dot: {
