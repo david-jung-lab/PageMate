@@ -4,7 +4,6 @@ import app.pagemate.auth.OAuthProvider;
 import app.pagemate.auth.client.GoogleOAuthClient;
 import app.pagemate.auth.client.KakaoOAuthClient;
 import app.pagemate.book.Book;
-import app.pagemate.book.BookCondition;
 import app.pagemate.book.BookRepository;
 import app.pagemate.common.security.JwtProvider;
 import app.pagemate.common.service.S3Service;
@@ -83,7 +82,6 @@ class ExchangeControllerTest {
                 .title("상대방 책")
                 .author("작가A")
                 .genre("소설")
-                .condition(BookCondition.GOOD)
                 .coverColor("blue")
                 .build());
 
@@ -92,7 +90,6 @@ class ExchangeControllerTest {
                 .title("내 제안 책")
                 .author("작가B")
                 .genre("SF")
-                .condition(BookCondition.LIKE_NEW)
                 .coverColor("orange")
                 .build());
 

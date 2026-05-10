@@ -14,7 +14,7 @@ import PMAvatar from '../../src/components/ui/PMAvatar';
 import { booksApi } from '../../src/features/books/api';
 import { profileApi } from '../../src/features/profile/api';
 import { exchangeApi } from '../../src/features/exchange/api';
-import { CONDITION_LABELS, STATUS_LABELS } from '../../src/constants';
+import { STATUS_LABELS } from '../../src/constants';
 import { BookSummary } from '../../src/features/books/types';
 // import { useAuthStore } from '../../src/store';
 
@@ -138,10 +138,6 @@ export default function BookDetailScreen() {
             {book.publisher && (
               <Text style={styles.publisher}>{book.publisher}</Text>
             )}
-            <View style={styles.conditionRow}>
-              <Text style={styles.conditionLabel}>상태</Text>
-              <Text style={styles.conditionValue}>{CONDITION_LABELS[book.condition]}</Text>
-            </View>
             {book.distance != null && (
               <View style={styles.distanceRow}>
                 <PMIcon name="location" size={13} color={colors.textSecondary} />
@@ -351,9 +347,6 @@ const styles = StyleSheet.create({
   },
   author: { fontSize: 14, color: colors.textSecondary },
   publisher: { fontSize: 12, color: colors.textTertiary },
-  conditionRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
-  conditionLabel: { fontSize: 12, color: colors.textTertiary },
-  conditionValue: { fontSize: 12, fontWeight: '600', color: colors.text },
   distanceRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   distanceText: { fontSize: 12, color: colors.textSecondary },
 

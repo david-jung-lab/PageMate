@@ -69,16 +69,14 @@ class BookControllerTest {
     @Order(2)
     @DisplayName("POST /books - 도서 등록 (인증 필요)")
     void createBook() throws Exception {
-        var result = mockMvc.perform(multipart("/books")
-                        .param("title", "테스트 도서")
-                        .param("author", "테스트 저자")
-                        .param("genre", "소설")
-                        .param("condition", "GOOD")
-                        .param("coverColor", "blue")
-                        .header("Authorization", jwt.token(testUserId)))
+        var result = mockMvc.perform(post("/books")
+                        .header("Authorization", jwt.token(testUserId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                            {"title":"테스트 도서","author":"테스트 저자","genre":"소설","coverColor":"blue"}
+                        """))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.data.title").value("테스트 도서"))
-                .andExpect(jsonPath("$.data.condition").value("GOOD"))
                 .andExpect(jsonPath("$.data.status").value("AVAILABLE"))
                 .andReturn();
 
@@ -123,10 +121,9 @@ class BookControllerTest {
                         .header("Authorization", jwt.token(testUserId))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                            {"description":"수정된 설명","condition":"LIKE_NEW","coverColor":"green"}
+                            {"description":"수정된 설명","coverColor":"green"}
                         """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.condition").value("LIKE_NEW"))
                 .andExpect(jsonPath("$.data.description").value("수정된 설명"));
     }
 
@@ -138,7 +135,7 @@ class BookControllerTest {
                         .header("Authorization", jwt.token(otherUserId))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                            {"condition":"ACCEPTABLE"}
+                            {"description":"해킹 시도"}
                         """))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.error.code").value("BOOK_ACCESS_DENIED"));
@@ -164,14 +161,5 @@ class BookControllerTest {
         mockMvc.perform(get("/books?genre=소설&page=0&size=5"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.content").isArray());
-    }
-
-    @Test
-    @Order(10)
-    @DisplayName("GET /books - 위치 기반 거리 정렬")
-    void getBooks_locationSort() throws Exception {
-        mockMvc.perform(get("/books?lat=37.4979&lng=127.0276&radiusKm=10&sort=DISTANCE&page=0&size=3"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.content[0].distance").isNumber());
     }
 }

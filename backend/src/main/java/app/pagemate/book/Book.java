@@ -40,10 +40,6 @@ public class Book {
     @Column(nullable = false, length = 50)
     private String genre;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "book_condition", nullable = false, length = 20)
-    private BookCondition condition;
-
     @Column(length = 200)
     private String description;
 
@@ -77,9 +73,8 @@ public class Book {
         this.status = status;
     }
 
-    public void update(String description, BookCondition condition, String coverColor) {
+    public void update(String description, String coverColor) {
         if (description != null) this.description = description;
-        if (condition != null) this.condition = condition;
         if (coverColor != null) this.coverColor = coverColor;
     }
 }

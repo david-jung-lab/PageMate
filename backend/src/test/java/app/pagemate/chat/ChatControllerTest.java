@@ -49,7 +49,7 @@ class ChatControllerTest {
 
         Book book = bookRepository.save(Book.builder()
                 .owner(owner).title("채팅테스트책").author("저자").genre("소설")
-                .condition(app.pagemate.book.BookCondition.GOOD).coverColor("blue").build());
+                .coverColor("blue").build());
 
         requesterId = requester.getId();
         ownerId = owner.getId();

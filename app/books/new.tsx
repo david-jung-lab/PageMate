@@ -9,11 +9,10 @@ import { colors, spacing, radius } from '../../src/theme/tokens';
 import PMIcon from '../../src/components/ui/PMIcon';
 import PMBookCover from '../../src/components/ui/PMBookCover';
 import { booksApi } from '../../src/features/books/api';
-import { BookCondition, CoverColor, KakaoBookItem } from '../../src/features/books/types';
-import { GENRES, CONDITION_LABELS } from '../../src/constants';
+import { CoverColor, KakaoBookItem } from '../../src/features/books/types';
+import { GENRES } from '../../src/constants';
 import { bookCoverPalettes } from '../../src/theme/tokens';
 
-const CONDITIONS: BookCondition[] = ['LIKE_NEW', 'GOOD', 'ACCEPTABLE'];
 const COVER_COLORS = Object.keys(bookCoverPalettes) as CoverColor[];
 
 export default function NewBookScreen() {
@@ -27,7 +26,6 @@ export default function NewBookScreen() {
   const [publisher, setPublisher] = useState('');
   const [isbn, setIsbn] = useState('');
   const [genre, setGenre] = useState('');
-  const [condition, setCondition] = useState<BookCondition>('GOOD');
   const [description, setDescription] = useState('');
   const [coverColor, setCoverColor] = useState<CoverColor>('sage');
 
@@ -38,19 +36,16 @@ export default function NewBookScreen() {
   });
 
   const { mutate: submit, isPending } = useMutation({
-    mutationFn: () => {
-      const formData = new FormData();
-      formData.append('title', title);
-      formData.append('author', author);
-      if (publisher) formData.append('publisher', publisher);
-      if (isbn) formData.append('isbn', isbn);
-      formData.append('genre', genre);
-      formData.append('condition', condition);
-      if (description) formData.append('description', description);
-      formData.append('coverColor', coverColor);
-      if (selectedKakao?.thumbnail) formData.append('kakaoThumbnailUrl', selectedKakao.thumbnail);
-      return booksApi.createBook(formData);
-    },
+    mutationFn: () => booksApi.createBook({
+      title,
+      author,
+      publisher: publisher || undefined,
+      isbn: isbn || undefined,
+      genre,
+      description: description || undefined,
+      coverColor,
+      kakaoThumbnailUrl: selectedKakao?.thumbnail ?? undefined,
+    }),
     onSuccess: () => {
       Alert.alert('등록 완료', '도서가 등록되었어요!');
       router.back();
@@ -191,28 +186,6 @@ export default function NewBookScreen() {
                 activeOpacity={0.75}
               >
                 <Text style={[styles.chipText, genre === g && styles.chipTextActive]}>{g}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-
-        {/* 컨디션 */}
-        <View style={styles.section}>
-          <Text style={styles.label}>상태 *</Text>
-          <View style={styles.conditionRow}>
-            {CONDITIONS.map((c) => (
-              <TouchableOpacity
-                key={c}
-                style={[styles.conditionChip, condition === c && styles.conditionChipActive]}
-                onPress={() => setCondition(c)}
-                activeOpacity={0.75}
-              >
-                <Text style={[styles.conditionText, condition === c && styles.conditionTextActive]}>
-                  {CONDITION_LABELS[c]}
-                </Text>
-                <Text style={[styles.conditionSub, condition === c && { color: 'rgba(255,255,255,0.8)' }]}>
-                  {c === 'LIKE_NEW' ? '거의 새 책' : c === 'GOOD' ? '읽은 흔적 있음' : '사용감 있음'}
-                </Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -385,19 +358,6 @@ const styles = StyleSheet.create({
   chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   chipText: { fontSize: 13, fontWeight: '500', color: colors.textSecondary },
   chipTextActive: { color: '#fff', fontWeight: '700' },
-
-  conditionRow: { flexDirection: 'row', gap: 8 },
-  conditionChip: {
-    flex: 1, paddingVertical: 12,
-    borderRadius: radius.md,
-    alignItems: 'center', justifyContent: 'center', gap: 4,
-    backgroundColor: colors.surface2,
-    borderWidth: 1, borderColor: colors.border,
-  },
-  conditionChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  conditionText: { fontSize: 16, fontWeight: '800', color: colors.text },
-  conditionTextActive: { color: '#fff' },
-  conditionSub: { fontSize: 10, color: colors.textTertiary, textAlign: 'center' },
 
   colorRow: { flexDirection: 'row', gap: 12, paddingVertical: 4 },
   colorDot: {
