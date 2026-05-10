@@ -74,11 +74,9 @@ export default function SwapScreen() {
   });
 
   const allExchanges = activeData?.content ?? [];
-  const displayed = allExchanges.filter(e =>
-    tab === 'active'
-      ? activeStatuses.includes(e.status)
-      : doneStatuses.includes(e.status)
-  );
+  const activeList = allExchanges.filter(e => activeStatuses.includes(e.status));
+  const doneList   = allExchanges.filter(e => doneStatuses.includes(e.status));
+  const displayed  = tab === 'active' ? activeList : doneList;
 
   const handleComplete = (id: number) => {
     setSelectedDays(7);
@@ -184,12 +182,19 @@ export default function SwapScreen() {
 
       {item.status === 'FIRST_EXCHANGED' && (
         <>
-          {item.dueDate && (
-            <View style={styles.dueDateRow}>
-              <Text style={styles.dueDateLabel}>반납 기한</Text>
-              <Text style={styles.dueDateValue}>{item.dueDate}</Text>
-            </View>
-          )}
+          {item.dueDate && (() => {
+            const daysLeft = Math.ceil((new Date(item.dueDate).getTime() - Date.now()) / 86400000);
+            return (
+              <View style={styles.dueDateRow}>
+                <Text style={styles.dueDateLabel}>
+                  반납 기한 · {item.dueDate}
+                </Text>
+                <Text style={[styles.dueDateValue, daysLeft <= 3 && { color: '#EF4444' }]}>
+                  {daysLeft > 0 ? `D-${daysLeft}` : daysLeft === 0 ? 'D-day' : '기한 초과'}
+                </Text>
+              </View>
+            );
+          })()}
           <View style={styles.actions}>
             <TouchableOpacity style={styles.btnPrimary} onPress={() => handleSecondComplete(item.id)}>
               <Text style={styles.btnPrimaryText}>반납 완료</Text>
@@ -275,12 +280,22 @@ export default function SwapScreen() {
           onPress={() => setTab('active')}
         >
           <Text style={[styles.tabText, tab === 'active' && styles.tabTextActive]}>진행 중</Text>
+          {activeList.length > 0 && (
+            <View style={styles.tabBadge}>
+              <Text style={styles.tabBadgeText}>{activeList.length}</Text>
+            </View>
+          )}
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.tab, tab === 'done' && styles.tabActive]}
           onPress={() => setTab('done')}
         >
           <Text style={[styles.tabText, tab === 'done' && styles.tabTextActive]}>완료·거절</Text>
+          {doneList.length > 0 && (
+            <View style={[styles.tabBadge, styles.tabBadgeDone]}>
+              <Text style={styles.tabBadgeText}>{doneList.length}</Text>
+            </View>
+          )}
         </TouchableOpacity>
       </View>
 
@@ -345,10 +360,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.s4,
     gap: 24,
   },
-  tab: { paddingVertical: 12 },
+  tab: { paddingVertical: 12, flexDirection: 'row', alignItems: 'center', gap: 6 },
   tabActive: { borderBottomWidth: 2, borderBottomColor: colors.primary },
   tabText: { fontSize: 14, color: colors.textTertiary, fontWeight: '600' },
   tabTextActive: { color: colors.primary },
+  tabBadge: {
+    minWidth: 18, height: 18, borderRadius: 9,
+    backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  tabBadgeDone: { backgroundColor: colors.textTertiary },
+  tabBadgeText: { fontSize: 10, fontWeight: '700', color: '#fff' },
 
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
   emptyText: { fontSize: 14, color: colors.textTertiary },

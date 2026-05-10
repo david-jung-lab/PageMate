@@ -119,14 +119,10 @@ export default function BookDetailScreen() {
             {book.publisher && (
               <Text style={styles.publisher}>{book.publisher}</Text>
             )}
-            {book.distance != null && (
+            {book.neighborhood && (
               <View style={styles.distanceRow}>
                 <PMIcon name="location" size={13} color={colors.textSecondary} />
-                <Text style={styles.distanceText}>
-                  {book.distance < 1
-                    ? `${Math.round(book.distance * 1000)}m 거리`
-                    : `${book.distance.toFixed(1)}km 거리`}
-                </Text>
+                <Text style={styles.distanceText}>{book.neighborhood}</Text>
               </View>
             )}
           </View>

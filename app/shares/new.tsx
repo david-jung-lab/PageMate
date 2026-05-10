@@ -343,19 +343,28 @@ export default function ShareTemplateScreen() {
           )}
         </View>
 
-        {/* Share Button */}
-        <TouchableOpacity
-          style={[styles.shareBtn, sharing && styles.shareBtnDisabled]}
-          onPress={handleShare}
-          disabled={sharing}
-          activeOpacity={0.85}
-        >
-          {sharing ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.shareBtnText}>공유하기</Text>
-          )}
-        </TouchableOpacity>
+        {/* Buttons */}
+        <View style={styles.btnRow}>
+          <TouchableOpacity
+            style={[styles.saveBtn]}
+            onPress={() => Alert.alert('갤러리 저장', '이미지 저장 기능은 네이티브 앱 빌드에서 지원됩니다.')}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.saveBtnText}>갤러리 저장</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.shareBtn, sharing && styles.shareBtnDisabled]}
+            onPress={handleShare}
+            disabled={sharing}
+            activeOpacity={0.85}
+          >
+            {sharing ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.shareBtnText}>공유하기</Text>
+            )}
+          </TouchableOpacity>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -495,9 +504,25 @@ const styles = StyleSheet.create({
   paceValue: { fontSize: 18, fontWeight: '800', color: colors.primary, letterSpacing: -0.5 },
   paceUnit: { fontSize: 12, fontWeight: '400', color: colors.textTertiary },
 
-  shareBtn: {
+  btnRow: {
+    flexDirection: 'row',
+    gap: 10,
     marginHorizontal: spacing.s4,
     marginTop: spacing.s5,
+  },
+  saveBtn: {
+    flex: 1,
+    height: 52,
+    backgroundColor: colors.surface,
+    borderWidth: 1.5,
+    borderColor: colors.primary,
+    borderRadius: radius.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  saveBtnText: { fontSize: 15, fontWeight: '700', color: colors.primary, letterSpacing: -0.2 },
+  shareBtn: {
+    flex: 1,
     height: 52,
     backgroundColor: colors.primary,
     borderRadius: radius.lg,

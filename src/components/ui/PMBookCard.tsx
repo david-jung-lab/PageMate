@@ -33,10 +33,6 @@ const PinIcon = ({ size = 10, color = C.text3 }: { size?: number; color?: string
   </Svg>
 );
 
-function formatDist(d: number | null): string {
-  if (d == null) return '근처';
-  return d < 1 ? `${Math.round(d * 1000)}m` : `${d.toFixed(1)}km`;
-}
 
 interface PMBookCardProps {
   book: BookSummary;
@@ -92,7 +88,7 @@ const PMBookCard: React.FC<PMBookCardProps> = ({ book, onPress }) => {
         <View style={styles.locRow}>
           <PinIcon />
           <Text style={styles.locText}>
-            {formatDist(book.distance)} · {book.owner.nickname}
+            {book.neighborhood ?? '위치 미설정'} · {book.owner.nickname}
           </Text>
         </View>
       </View>

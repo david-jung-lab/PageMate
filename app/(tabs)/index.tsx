@@ -14,7 +14,9 @@ import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import Svg, { Path, Circle } from 'react-native-svg';
 import { booksApi } from '../../src/features/books/api';
+import { exchangeApi } from '../../src/features/exchange/api';
 import { CoverColor } from '../../src/features/books/types';
+import { Exchange } from '../../src/features/exchange/types';
 import { useAuthStore } from '../../src/store';
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
@@ -66,6 +68,78 @@ const ChevronRight = ({ size = 12, color = C.text2 }: { size?: number; color?: s
     <Path d="m9 6 6 6-6 6" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
   </Svg>
 );
+
+// ─── Active exchange card ─────────────────────────────────────────────────────
+function calcDaysLeft(dueDate: string | null): number | null {
+  if (!dueDate) return null;
+  return Math.ceil((new Date(dueDate).getTime() - Date.now()) / 86400000);
+}
+
+const ActiveExchangeCard = ({ exchange, onChat }: { exchange: Exchange; onChat?: () => void }) => {
+  const daysLeft = calcDaysLeft(exchange.dueDate);
+  const partner = exchange.respondent;
+  return (
+    <TouchableOpacity style={activeExSt.card} activeOpacity={0.85} onPress={onChat}>
+      <View style={activeExSt.topRow}>
+        <Text style={activeExSt.badge}>
+          {exchange.status === 'FIRST_EXCHANGED' ? '반납 대기' : '교환 중'}
+        </Text>
+        {daysLeft != null && (
+          <Text style={[activeExSt.dDay, daysLeft <= 3 && { color: '#EF4444' }]}>
+            {daysLeft > 0 ? `D-${daysLeft}` : daysLeft === 0 ? 'D-day' : '기한 초과'}
+          </Text>
+        )}
+      </View>
+      <Text style={activeExSt.partner}>{partner.nickname}님과 교환 중</Text>
+      <View style={activeExSt.booksRow}>
+        <Text style={activeExSt.bookTitle} numberOfLines={1}>
+          {exchange.selectedBook?.title ?? '(대기 중)'}
+        </Text>
+        <Text style={activeExSt.arrow}>↔</Text>
+        <Text style={activeExSt.bookTitle} numberOfLines={1}>
+          {exchange.requestedBook.title}
+        </Text>
+      </View>
+      {exchange.chatRoomId && (
+        <View style={activeExSt.chatBtn}>
+          <Text style={activeExSt.chatBtnText}>채팅 바로가기</Text>
+        </View>
+      )}
+    </TouchableOpacity>
+  );
+};
+
+const activeExSt = StyleSheet.create({
+  card: {
+    marginHorizontal: 20,
+    backgroundColor: C.card,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: C.line,
+    padding: 16,
+    gap: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  badge: { fontSize: 11, fontWeight: '700', color: C.primary, backgroundColor: '#EEF2FF', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
+  dDay: { fontSize: 13, fontWeight: '700', color: C.primary },
+  partner: { fontSize: 15, fontWeight: '700', color: C.text, letterSpacing: -0.3 },
+  booksRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  bookTitle: { flex: 1, fontSize: 13, color: C.text2, letterSpacing: -0.2 },
+  arrow: { fontSize: 14, color: C.text3, fontWeight: '700' },
+  chatBtn: {
+    marginTop: 4,
+    backgroundColor: C.primary,
+    borderRadius: 10,
+    paddingVertical: 8,
+    alignItems: 'center',
+  },
+  chatBtnText: { fontSize: 13, fontWeight: '700', color: '#FFFFFF' },
+});
 
 const ShareIcon = () => (
   <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
@@ -249,6 +323,14 @@ export default function HomeScreen() {
     queryFn: () => booksApi.getBooks({ sort: 'LATEST', page: 0, size: 5 }),
   });
 
+  const { data: activeExchanges } = useQuery({
+    queryKey: ['exchanges', 'active-home'],
+    queryFn: () => exchangeApi.getMyExchanges(undefined, 0, 10),
+    select: (data) => data.content.filter(
+      (e) => e.status === 'ACCEPTED' || e.status === 'FIRST_EXCHANGED'
+    ),
+  });
+
   return (
     <SafeAreaView style={s.safe}>
       <StatusBar barStyle="dark-content" backgroundColor={C.bg} />
@@ -277,6 +359,20 @@ export default function HomeScreen() {
             <Text style={s.locText}>망원동 · 반경 2km · 독자 184명</Text>
           </View>
         </View>
+
+        {/* 진행 중인 교환독서 */}
+        {activeExchanges && activeExchanges.length > 0 && (
+          <View style={s.section}>
+            <SectionHeader title="진행 중인 교환독서" sub={`${activeExchanges.length}건 진행 중`} onMore={() => router.push('/(tabs)/swap' as any)} />
+            {activeExchanges.slice(0, 1).map((ex) => (
+              <ActiveExchangeCard
+                key={ex.id}
+                exchange={ex}
+                onChat={ex.chatRoomId ? () => router.push(`/chat/${ex.chatRoomId}` as any) : undefined}
+              />
+            ))}
+          </View>
+        )}
 
         {/* Search */}
         <TouchableOpacity
