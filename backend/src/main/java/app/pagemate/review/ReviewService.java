@@ -7,6 +7,7 @@ import app.pagemate.exchange.ExchangeRepository;
 import app.pagemate.exchange.ExchangeStatus;
 import app.pagemate.review.dto.ReviewCreateRequest;
 import app.pagemate.review.dto.ReviewResponse;
+import app.pagemate.review.dto.UserReviewsResponse;
 import app.pagemate.user.User;
 import app.pagemate.user.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -58,5 +59,15 @@ public class ReviewService {
 
     public boolean hasReviewed(Long reviewerId, Long exchangeId) {
         return reviewRepository.existsByExchangeIdAndReviewerId(exchangeId, reviewerId);
+    }
+
+    public UserReviewsResponse getUserReviews(Long userId) {
+        double avg = reviewRepository.averageRatingByRevieweeId(userId);
+        int count = (int) reviewRepository.countByRevieweeId(userId);
+        var reviews = reviewRepository.findByRevieweeIdOrderByCreatedAtDesc(userId)
+                .stream()
+                .map(UserReviewsResponse.ReviewItem::of)
+                .toList();
+        return new UserReviewsResponse(avg, count, reviews);
     }
 }

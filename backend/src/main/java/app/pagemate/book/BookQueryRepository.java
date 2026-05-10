@@ -59,7 +59,7 @@ public class BookQueryRepository {
                     .or(book.isbn.eq(keyword)));
         }
         if (StringUtils.hasText(genre)) builder.and(book.genre.eq(genre));
-        if (StringUtils.hasText(neighborhood)) builder.and(book.neighborhood.eq(neighborhood));
+        if (StringUtils.hasText(neighborhood)) builder.and(book.neighborhood.containsIgnoreCase(neighborhood));
         return builder;
     }
 }

@@ -30,10 +30,11 @@ public record BookDetailResponse(
             List<String> tags,
             int bookCount,
             int exchangeCount,
-            Double rating
+            double averageRating,
+            int reviewCount
     ) {}
 
-    public static BookDetailResponse of(Book book, int bookCount, int exchangeCount) {
+    public static BookDetailResponse of(Book book, int bookCount, int exchangeCount, double averageRating, int reviewCount) {
         var u = book.getOwner();
         return new BookDetailResponse(
                 book.getId(),
@@ -50,7 +51,7 @@ public record BookDetailResponse(
                 new OwnerDetailInfo(
                         u.getId(), u.getNickname(), u.getHandle(),
                         u.getProfileImage(), u.getBio(), u.getTags(),
-                        bookCount, exchangeCount, null
+                        bookCount, exchangeCount, averageRating, reviewCount
                 ),
                 book.getCreatedAt()
         );
