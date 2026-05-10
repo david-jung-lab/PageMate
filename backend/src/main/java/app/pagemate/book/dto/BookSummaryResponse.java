@@ -14,12 +14,12 @@ public record BookSummaryResponse(
         String coverColor,
         OwnerInfo owner,
         BookStatus status,
-        Double distance,
+        String neighborhood,
         LocalDateTime createdAt
 ) {
     public record OwnerInfo(Long id, String nickname, String profileImage) {}
 
-    public static BookSummaryResponse of(Book book, Double distance) {
+    public static BookSummaryResponse of(Book book) {
         return new BookSummaryResponse(
                 book.getId(),
                 book.getTitle(),
@@ -33,7 +33,7 @@ public record BookSummaryResponse(
                         book.getOwner().getProfileImage()
                 ),
                 book.getStatus(),
-                distance,
+                book.getNeighborhood(),
                 book.getCreatedAt()
         );
     }

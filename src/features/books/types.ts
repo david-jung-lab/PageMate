@@ -25,7 +25,7 @@ export interface BookSummary {
   coverColor: CoverColor;
   owner: BookOwner;
   status: BookStatus;
-  distance: number | null;
+  neighborhood: string | null;
   createdAt: string;
 }
 
@@ -40,7 +40,7 @@ export interface BookDetail {
   imageUrl: string | null;
   coverColor: CoverColor;
   status: BookStatus;
-  distance: number | null;
+  neighborhood: string | null;
   owner: BookOwnerDetail;
   createdAt: string;
 }

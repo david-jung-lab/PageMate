@@ -6,7 +6,6 @@ import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
@@ -55,11 +54,8 @@ public class Book {
     @Builder.Default
     private BookStatus status = BookStatus.AVAILABLE;
 
-    @Column(precision = 10, scale = 7)
-    private BigDecimal lat;
-
-    @Column(precision = 10, scale = 7)
-    private BigDecimal lng;
+    @Column(length = 100)
+    private String neighborhood;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false, nullable = false)

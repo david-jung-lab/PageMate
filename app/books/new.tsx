@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View, Text, TextInput, ScrollView, TouchableOpacity, Image,
   StyleSheet, SafeAreaView, StatusBar, ActivityIndicator, Alert,
@@ -10,6 +10,7 @@ import PMIcon from '../../src/components/ui/PMIcon';
 import PMBookCover from '../../src/components/ui/PMBookCover';
 import { booksApi } from '../../src/features/books/api';
 import { CoverColor, KakaoBookItem } from '../../src/features/books/types';
+import { locationApi, LocationResult } from '../../src/features/locations/api';
 import { GENRES } from '../../src/constants';
 import { bookCoverPalettes } from '../../src/theme/tokens';
 
@@ -29,6 +30,12 @@ export default function NewBookScreen() {
   const [description, setDescription] = useState('');
   const [coverColor, setCoverColor] = useState<CoverColor>('sage');
 
+  const [neighborhoodQuery, setNeighborhoodQuery] = useState('');
+  const [neighborhoodResults, setNeighborhoodResults] = useState<LocationResult[]>([]);
+  const [neighborhoodSearching, setNeighborhoodSearching] = useState(false);
+  const [selectedNeighborhood, setSelectedNeighborhood] = useState('');
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const { data: kakaoResults, isLoading: kakaoLoading, refetch } = useQuery({
     queryKey: ['kakao-search', searchQuery],
     queryFn: () => booksApi.searchKakao(searchQuery),
@@ -45,6 +52,7 @@ export default function NewBookScreen() {
       description: description || undefined,
       coverColor,
       kakaoThumbnailUrl: selectedKakao?.thumbnail ?? undefined,
+      neighborhood: selectedNeighborhood || undefined,
     }),
     onSuccess: () => {
       Alert.alert('등록 완료', '도서가 등록되었어요!');
@@ -62,6 +70,32 @@ export default function NewBookScreen() {
     setPublisher(item.publisher ?? '');
     setIsbn(item.isbn ?? '');
     setSearchQuery('');
+  };
+
+  const handleNeighborhoodChange = (text: string) => {
+    setNeighborhoodQuery(text);
+    if (!text.trim()) {
+      setNeighborhoodResults([]);
+      return;
+    }
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(async () => {
+      setNeighborhoodSearching(true);
+      try {
+        const results = await locationApi.search(text);
+        setNeighborhoodResults(results);
+      } catch {
+        setNeighborhoodResults([]);
+      } finally {
+        setNeighborhoodSearching(false);
+      }
+    }, 350);
+  };
+
+  const handleSelectNeighborhood = (result: LocationResult) => {
+    setSelectedNeighborhood(result.name);
+    setNeighborhoodQuery(result.name);
+    setNeighborhoodResults([]);
   };
 
   const handleSubmit = () => {
@@ -172,6 +206,57 @@ export default function NewBookScreen() {
             placeholder="출판사 (선택)"
             placeholderTextColor={colors.textTertiary}
           />
+        </View>
+
+        {/* 동네 설정 */}
+        <View style={styles.section}>
+          <Text style={styles.label}>교환 위치 (동네)</Text>
+          <View style={styles.neighborhoodInputWrap}>
+            <PMIcon name="location" size={16} color={colors.textTertiary} />
+            <TextInput
+              style={styles.input}
+              placeholder="동 이름으로 검색 (예: 망원동)"
+              placeholderTextColor={colors.textTertiary}
+              value={neighborhoodQuery}
+              onChangeText={handleNeighborhoodChange}
+              returnKeyType="search"
+            />
+            {neighborhoodSearching && <ActivityIndicator size="small" color={colors.primary} />}
+            {selectedNeighborhood ? (
+              <TouchableOpacity
+                onPress={() => { setSelectedNeighborhood(''); setNeighborhoodQuery(''); }}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <PMIcon name="close" size={14} color={colors.textTertiary} />
+              </TouchableOpacity>
+            ) : null}
+          </View>
+
+          {neighborhoodResults.length > 0 && (
+            <View style={styles.suggestionList}>
+              {neighborhoodResults.map((r, i) => (
+                <TouchableOpacity
+                  key={i}
+                  style={[styles.suggestionItem, i > 0 && styles.suggestionBorder]}
+                  onPress={() => handleSelectNeighborhood(r)}
+                  activeOpacity={0.7}
+                >
+                  <PMIcon name="location" size={14} color={colors.primary} />
+                  <View style={styles.suggestionTexts}>
+                    <Text style={styles.suggestionName}>{r.name}</Text>
+                    <Text style={styles.suggestionSub}>{r.district} · {r.city}</Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+
+          {selectedNeighborhood ? (
+            <View style={styles.selectedNeighborhood}>
+              <PMIcon name="location" size={13} color={colors.primary} />
+              <Text style={styles.selectedNeighborhoodText}>{selectedNeighborhood} 선택됨</Text>
+            </View>
+          ) : null}
         </View>
 
         {/* 장르 */}
@@ -304,35 +389,63 @@ const styles = StyleSheet.create({
   searchBtnText: { fontSize: 13, fontWeight: '700', color: '#fff' },
 
   kakaoThumb: {
-    width: 40,
-    height: 58,
-    borderRadius: 4,
-    flexShrink: 0,
-    backgroundColor: colors.border,
+    width: 40, height: 58, borderRadius: 4, flexShrink: 0, backgroundColor: colors.border,
   },
-  previewImg: {
-    width: 100,
-    height: 144,
-    borderRadius: 8,
-  },
+  previewImg: { width: 100, height: 144, borderRadius: 8 },
   kakaoItem: {
-    flexDirection: 'row',
-    gap: 12,
-    alignItems: 'center',
-    paddingVertical: 10,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    marginTop: 8,
+    flexDirection: 'row', gap: 12, alignItems: 'center',
+    paddingVertical: 10, borderTopWidth: 1, borderTopColor: colors.border, marginTop: 8,
   },
   kakaoMeta: { flex: 1 },
   kakaoTitle: { fontSize: 13, fontWeight: '600', color: colors.text },
   kakaoAuthor: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
   kakaoPublisher: { fontSize: 11, color: colors.textTertiary, marginTop: 1 },
 
-  previewSection: {
+  previewSection: { alignItems: 'center', paddingVertical: 20 },
+
+  neighborhoodInputWrap: {
+    flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 20,
+    gap: 8,
+    backgroundColor: colors.surface2,
+    borderRadius: radius.md,
+    paddingHorizontal: 12,
+    height: 40,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
+  suggestionList: {
+    marginTop: 8,
+    backgroundColor: colors.bg,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    overflow: 'hidden',
+  },
+  suggestionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: colors.bg,
+  },
+  suggestionBorder: { borderTopWidth: 1, borderTopColor: colors.border },
+  suggestionTexts: { flex: 1 },
+  suggestionName: { fontSize: 14, fontWeight: '600', color: colors.text },
+  suggestionSub: { fontSize: 11, color: colors.textTertiary, marginTop: 1 },
+  selectedNeighborhood: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    backgroundColor: colors.primarySoft,
+    borderRadius: radius.md,
+    alignSelf: 'flex-start',
+  },
+  selectedNeighborhoodText: { fontSize: 13, fontWeight: '600', color: colors.primary },
 
   textInput: {
     backgroundColor: colors.surface2,
@@ -360,14 +473,8 @@ const styles = StyleSheet.create({
   chipTextActive: { color: '#fff', fontWeight: '700' },
 
   colorRow: { flexDirection: 'row', gap: 12, paddingVertical: 4 },
-  colorDot: {
-    width: 32, height: 32,
-    borderRadius: radius.full,
-  },
-  colorDotActive: {
-    borderWidth: 3,
-    borderColor: colors.text,
-  },
+  colorDot: { width: 32, height: 32, borderRadius: radius.full },
+  colorDotActive: { borderWidth: 3, borderColor: colors.text },
 
   submitBtn: {
     marginHorizontal: spacing.s4,

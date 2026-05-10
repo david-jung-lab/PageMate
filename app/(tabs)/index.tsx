@@ -69,10 +69,10 @@ const ChevronRight = ({ size = 12, color = C.text2 }: { size?: number; color?: s
 
 // ─── Near book card (image + title + location) ────────────────────────────────
 const NearBookCard = ({
-  title, author, imageUrl, color, distance, ownerNickname, onPress,
+  title, author, imageUrl, color, neighborhood, ownerNickname, onPress,
 }: {
   title: string; author: string; imageUrl: string | null;
-  color: CoverColor; distance: number | null; ownerNickname: string; onPress: () => void;
+  color: CoverColor; neighborhood: string | null; ownerNickname: string; onPress: () => void;
 }) => {
   const { bg, fg } = MINI_COVER[color] ?? MINI_COVER.blue;
   return (
@@ -96,7 +96,7 @@ const NearBookCard = ({
         <Text style={nearCardSt.author} numberOfLines={1}>{author}</Text>
         <View style={nearCardSt.locRow}>
           <PinIcon size={10} color={C.text3} />
-          <Text style={nearCardSt.locText}>{formatDist(distance)} · {ownerNickname}</Text>
+          <Text style={nearCardSt.locText}>{neighborhood ?? '위치 미설정'} · {ownerNickname}</Text>
         </View>
       </View>
     </TouchableOpacity>
@@ -216,11 +216,6 @@ const secStyles = StyleSheet.create({
 });
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-function formatDist(d: number | null): string {
-  if (d == null) return '근처';
-  return d < 1 ? `${Math.round(d * 1000)}m` : `${d.toFixed(1)}km`;
-}
-
 function formatTime(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
   const min = Math.floor(diff / 60000);
@@ -307,7 +302,7 @@ export default function HomeScreen() {
                   author={b.author}
                   imageUrl={b.imageUrl}
                   color={b.coverColor}
-                  distance={b.distance}
+                  neighborhood={b.neighborhood}
                   ownerNickname={b.owner.nickname}
                   onPress={() => router.push(`/books/${b.id}`)}
                 />

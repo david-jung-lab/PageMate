@@ -17,9 +17,9 @@ public class BookQueryRepository {
 
     private final JPAQueryFactory queryFactory;
 
-    public Page<Book> findBooks(String keyword, String genre, Pageable pageable) {
+    public Page<Book> findBooks(String keyword, String genre, String neighborhood, Pageable pageable) {
         QBook book = QBook.book;
-        BooleanBuilder builder = buildFilter(keyword, genre);
+        BooleanBuilder builder = buildFilter(keyword, genre, neighborhood);
         builder.and(book.status.eq(BookStatus.AVAILABLE));
 
         List<Book> content = queryFactory.selectFrom(book)
@@ -50,7 +50,7 @@ public class BookQueryRepository {
         return new PageImpl<>(content, pageable, total);
     }
 
-    private BooleanBuilder buildFilter(String keyword, String genre) {
+    private BooleanBuilder buildFilter(String keyword, String genre, String neighborhood) {
         QBook book = QBook.book;
         BooleanBuilder builder = new BooleanBuilder();
         if (StringUtils.hasText(keyword)) {
@@ -59,6 +59,7 @@ public class BookQueryRepository {
                     .or(book.isbn.eq(keyword)));
         }
         if (StringUtils.hasText(genre)) builder.and(book.genre.eq(genre));
+        if (StringUtils.hasText(neighborhood)) builder.and(book.neighborhood.eq(neighborhood));
         return builder;
     }
 }

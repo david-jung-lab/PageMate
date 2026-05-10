@@ -10,6 +10,7 @@ export const booksApi = {
   getBooks: async (params?: {
     keyword?: string;
     genre?: string;
+    neighborhood?: string;
     sort?: string;
     page?: number;
     size?: number;
@@ -39,6 +40,7 @@ export const booksApi = {
     description?: string;
     coverColor?: string;
     kakaoThumbnailUrl?: string;
+    neighborhood?: string;
   }) => {
     const res = await api.post<ApiResponse<BookDetail>>('/books', data);
     return res.data.data;

@@ -27,4 +27,6 @@ public class BookCreateRequest {
     private String coverColor = "sage";
 
     private String kakaoThumbnailUrl;
+
+    private String neighborhood;
 }

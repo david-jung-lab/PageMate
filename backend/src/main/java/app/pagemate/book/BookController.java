@@ -45,12 +45,13 @@ public class BookController {
     public ResponseEntity<ApiResponse<BookPageResponse<BookSummaryResponse>>> getBooks(
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) String genre,
+            @RequestParam(required = false) String neighborhood,
             @RequestParam(defaultValue = "LATEST") String sort,
             @RequestParam(defaultValue = "0") @Min(0) int page,
             @RequestParam(defaultValue = "20") @Min(1) @Max(50) int size
     ) {
         return ResponseEntity.ok(ApiResponse.ok(
-                bookService.getBooks(keyword, genre, sort, page, size)));
+                bookService.getBooks(keyword, genre, neighborhood, sort, page, size)));
     }
 
     @GetMapping("/me")

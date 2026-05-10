@@ -17,7 +17,7 @@ public record BookDetailResponse(
         String imageUrl,
         String coverColor,
         BookStatus status,
-        Double distance,
+        String neighborhood,
         OwnerDetailInfo owner,
         LocalDateTime createdAt
 ) {
@@ -33,7 +33,7 @@ public record BookDetailResponse(
             Double rating
     ) {}
 
-    public static BookDetailResponse of(Book book, Double distance, int bookCount, int exchangeCount) {
+    public static BookDetailResponse of(Book book, int bookCount, int exchangeCount) {
         var u = book.getOwner();
         return new BookDetailResponse(
                 book.getId(),
@@ -46,7 +46,7 @@ public record BookDetailResponse(
                 book.getImageUrl(),
                 book.getCoverColor(),
                 book.getStatus(),
-                distance,
+                book.getNeighborhood(),
                 new OwnerDetailInfo(
                         u.getId(), u.getNickname(), u.getHandle(),
                         u.getProfileImage(), u.getBio(), u.getTags(),

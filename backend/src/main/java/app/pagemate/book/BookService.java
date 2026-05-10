@@ -35,18 +35,19 @@ public class BookService {
                 .description(req.getDescription())
                 .imageUrl(req.getKakaoThumbnailUrl())
                 .coverColor(req.getCoverColor() != null ? req.getCoverColor() : "sage")
+                .neighborhood(req.getNeighborhood())
                 .build();
 
         bookRepository.save(book);
         int bookCount = bookRepository.countByOwnerId(owner.getId());
-        return BookDetailResponse.of(book, null, bookCount, 0);
+        return BookDetailResponse.of(book, bookCount, 0);
     }
 
     public BookPageResponse<BookSummaryResponse> getBooks(
-            String keyword, String genre, String sort, int page, int size
+            String keyword, String genre, String neighborhood, String sort, int page, int size
     ) {
-        Page<Book> bookPage = bookQueryRepository.findBooks(keyword, genre, PageRequest.of(page, size));
-        return BookPageResponse.of(bookPage, b -> BookSummaryResponse.of(b, null));
+        Page<Book> bookPage = bookQueryRepository.findBooks(keyword, genre, neighborhood, PageRequest.of(page, size));
+        return BookPageResponse.of(bookPage, BookSummaryResponse::of);
     }
 
     public BookDetailResponse getBook(Long bookId) {
@@ -54,7 +55,7 @@ public class BookService {
                 .orElseThrow(() -> new PagemateException(ErrorCode.BOOK_NOT_FOUND));
 
         int bookCount = bookRepository.countByOwnerId(book.getOwner().getId());
-        return BookDetailResponse.of(book, null, bookCount, 0);
+        return BookDetailResponse.of(book, bookCount, 0);
     }
 
     @Transactional
@@ -68,7 +69,7 @@ public class BookService {
 
         book.update(req.description(), req.coverColor());
         int bookCount = bookRepository.countByOwnerId(userId);
-        return BookDetailResponse.of(book, null, bookCount, 0);
+        return BookDetailResponse.of(book, bookCount, 0);
     }
 
     @Transactional
@@ -85,6 +86,6 @@ public class BookService {
 
     public BookPageResponse<BookSummaryResponse> getMyBooks(Long userId, BookStatus status, int page, int size) {
         Page<Book> bookPage = bookQueryRepository.findMyBooks(userId, status, PageRequest.of(page, size));
-        return BookPageResponse.of(bookPage, b -> BookSummaryResponse.of(b, null));
+        return BookPageResponse.of(bookPage, BookSummaryResponse::of);
     }
 }
