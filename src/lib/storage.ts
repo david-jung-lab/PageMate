@@ -29,15 +29,17 @@ const remove = (key: string): Promise<void> => {
 };
 
 const GENRE_PENDING_KEY = 'pm_genre_pending';
+const USER_KEY = 'pm_user';
 
 export const storage = {
   getAccessToken: () => get(ACCESS_KEY),
   setAccessToken: (token: string) => set(ACCESS_KEY, token),
   getRefreshToken: () => get(REFRESH_KEY),
   setRefreshToken: (token: string) => set(REFRESH_KEY, token),
+  getUser: () => get(USER_KEY).then(v => (v ? JSON.parse(v) : null)),
+  setUser: (user: object) => set(USER_KEY, JSON.stringify(user)),
   clearTokens: async () => {
-    await remove(ACCESS_KEY);
-    await remove(REFRESH_KEY);
+    await Promise.all([remove(ACCESS_KEY), remove(REFRESH_KEY), remove(USER_KEY)]);
   },
   getGenrePending: () => get(GENRE_PENDING_KEY),
   setGenrePending: () => set(GENRE_PENDING_KEY, 'true'),

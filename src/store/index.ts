@@ -23,6 +23,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     await Promise.all([
       storage.setAccessToken(accessToken),
       storage.setRefreshToken(refreshToken),
+      storage.setUser(user),
     ]);
     set({ accessToken, isAuthenticated: true, user });
   },
@@ -38,9 +39,12 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   hydrate: async () => {
-    const accessToken = await storage.getAccessToken();
+    const [accessToken, user] = await Promise.all([
+      storage.getAccessToken(),
+      storage.getUser(),
+    ]);
     if (accessToken) {
-      set({ accessToken, isAuthenticated: true, isHydrated: true });
+      set({ accessToken, isAuthenticated: true, isHydrated: true, user: user ?? null });
     } else {
       set({ isHydrated: true });
     }

@@ -100,7 +100,14 @@ export default function SwapScreen() {
     ]);
   };
 
-  const renderExchange = ({ item }: { item: Exchange }) => (
+  const renderExchange = ({ item }: { item: Exchange }) => {
+    const isRequester = myUserId === item.requester.id;
+    const partner = isRequester ? item.respondent : item.requester;
+    const myBook = isRequester ? item.selectedBook : item.requestedBook;
+    const theirBook = isRequester ? item.requestedBook : item.selectedBook;
+    const theirLabel = isRequester ? '원하는 책' : '상대 책';
+
+    return (
     <View style={styles.card}>
       <View style={styles.cardHeader}>
         <PMBadge variant={STATUS_VARIANT[item.status]} size="sm">
@@ -112,12 +119,12 @@ export default function SwapScreen() {
       </View>
 
       <View style={styles.booksRow}>
-        {item.selectedBook ? (
+        {myBook ? (
           <BookMini
-            title={item.selectedBook.title}
-            author={item.selectedBook.author}
-            imageUrl={item.selectedBook.imageUrl}
-            coverColor={item.selectedBook.coverColor}
+            title={myBook.title}
+            author={myBook.author}
+            imageUrl={myBook.imageUrl}
+            coverColor={myBook.coverColor}
             label="내 책"
           />
         ) : (
@@ -130,29 +137,38 @@ export default function SwapScreen() {
           </View>
         )}
         <PMIcon name="swap" size={20} color={colors.textTertiary} />
-        <BookMini
-          title={item.requestedBook.title}
-          author={item.requestedBook.author}
-          imageUrl={item.requestedBook.imageUrl}
-          coverColor={item.requestedBook.coverColor}
-          label="원하는 책"
-        />
+        {theirBook ? (
+          <BookMini
+            title={theirBook.title}
+            author={theirBook.author}
+            imageUrl={theirBook.imageUrl}
+            coverColor={theirBook.coverColor}
+            label={theirLabel}
+          />
+        ) : (
+          <View style={styles.bookMini}>
+            <Text style={styles.bookMiniLabel}>{theirLabel}</Text>
+            <View style={styles.bookMiniPlaceholder}>
+              <PMIcon name="swap" size={20} color={colors.borderStrong} />
+            </View>
+            <Text style={styles.bookMiniTitle}>선택 대기 중</Text>
+          </View>
+        )}
       </View>
 
       <View style={styles.partnerRow}>
         <PMAvatar
-          name={item.respondent.nickname}
-          color={item.respondent.avatarColor ?? 'blue'}
+          name={partner.nickname}
+          color={partner.avatarColor ?? 'blue'}
           size={28}
-          imageUrl={item.respondent.profileImage ?? undefined}
         />
-        <Text style={styles.partnerName}>{item.respondent.nickname}</Text>
+        <Text style={styles.partnerName}>{partner.nickname}</Text>
         <Text style={styles.partnerLabel}>와(과) 교환</Text>
       </View>
 
       {item.status === 'PENDING' && (
         <View style={styles.actions}>
-          {item.respondent.id === myUserId ? (
+          {!isRequester ? (
             <TouchableOpacity
               style={styles.btnPrimary}
               onPress={() => router.push(`/exchanges/${item.id}/respond` as any)}
@@ -207,6 +223,7 @@ export default function SwapScreen() {
       )}
     </View>
   );
+  };
 
   const dueDate = periodModal
     ? new Date(Date.now() + selectedDays * 86400000).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })

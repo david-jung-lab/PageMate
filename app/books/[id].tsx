@@ -14,6 +14,7 @@ import PMAvatar from '../../src/components/ui/PMAvatar';
 import { booksApi } from '../../src/features/books/api';
 import { exchangeApi } from '../../src/features/exchange/api';
 import { STATUS_LABELS, GENRE_LABELS } from '../../src/constants';
+import { useAuthStore } from '../../src/store';
 import Svg, { Path } from 'react-native-svg';
 
 const statusVariant = (s: string) => {
@@ -26,6 +27,7 @@ export default function BookDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const queryClient = useQueryClient();
+  const myUserId = useAuthStore(s => s.user?.id);
 
   const { data: book, isLoading } = useQuery({
     queryKey: ['book', id],
@@ -42,8 +44,9 @@ export default function BookDetailScreen() {
     onError: (err: any) => {
       const code = err?.response?.data?.error?.code;
       const msg =
-        code === 'DUPLICATE_REQUEST' ? '이미 요청한 도서예요.' :
+        code === 'DUPLICATE_REQUEST' ? '이미 교환 요청한 도서예요.' :
         code === 'BOOK_NOT_AVAILABLE' ? '교환할 수 없는 상태의 책이에요.' :
+        code === 'SELF_EXCHANGE' ? '내 책에는 교환 요청할 수 없어요.' :
         '교환 요청에 실패했어요.';
       Alert.alert('오류', msg);
     },
@@ -173,29 +176,31 @@ export default function BookDetailScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* 교환 요청 버튼 */}
-        <View style={styles.actionSection}>
-          <TouchableOpacity
-            style={[
-              styles.exchangeBtn,
-              (book.status !== 'AVAILABLE' || exchangeMutation.isPending) && styles.exchangeBtnDisabled,
-            ]}
-            activeOpacity={0.85}
-            disabled={book.status !== 'AVAILABLE' || exchangeMutation.isPending}
-            onPress={handleRequestExchange}
-          >
-            {exchangeMutation.isPending ? (
-              <ActivityIndicator color="#fff" size="small" />
-            ) : (
-              <>
-                <PMIcon name="swap" size={18} color="#fff" />
-                <Text style={styles.exchangeBtnText}>
-                  {book.status === 'AVAILABLE' ? '교환 요청하기' : '교환 불가'}
-                </Text>
-              </>
-            )}
-          </TouchableOpacity>
-        </View>
+        {/* 교환 요청 버튼 - 내 책이면 숨김 */}
+        {myUserId !== book.owner.id && (
+          <View style={styles.actionSection}>
+            <TouchableOpacity
+              style={[
+                styles.exchangeBtn,
+                (book.status !== 'AVAILABLE' || exchangeMutation.isPending) && styles.exchangeBtnDisabled,
+              ]}
+              activeOpacity={0.85}
+              disabled={book.status !== 'AVAILABLE' || exchangeMutation.isPending}
+              onPress={handleRequestExchange}
+            >
+              {exchangeMutation.isPending ? (
+                <ActivityIndicator color="#fff" size="small" />
+              ) : (
+                <>
+                  <PMIcon name="swap" size={18} color="#fff" />
+                  <Text style={styles.exchangeBtnText}>
+                    {book.status === 'AVAILABLE' ? '교환 요청하기' : '교환 불가'}
+                  </Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
