@@ -4,17 +4,17 @@ import * as SecureStore from 'expo-secure-store';
 const ACCESS_KEY  = 'pm_access_token';
 const REFRESH_KEY = 'pm_refresh_token';
 
-// expo-secure-store is not available on web — fall back to localStorage
+// expo-secure-store is not available on web — fall back to sessionStorage (tab-isolated)
 const get = (key: string): Promise<string | null> => {
   if (Platform.OS === 'web') {
-    return Promise.resolve(localStorage.getItem(key));
+    return Promise.resolve(sessionStorage.getItem(key));
   }
   return SecureStore.getItemAsync(key);
 };
 
 const set = (key: string, value: string): Promise<void> => {
   if (Platform.OS === 'web') {
-    localStorage.setItem(key, value);
+    sessionStorage.setItem(key, value);
     return Promise.resolve();
   }
   return SecureStore.setItemAsync(key, value);
@@ -22,7 +22,7 @@ const set = (key: string, value: string): Promise<void> => {
 
 const remove = (key: string): Promise<void> => {
   if (Platform.OS === 'web') {
-    localStorage.removeItem(key);
+    sessionStorage.removeItem(key);
     return Promise.resolve();
   }
   return SecureStore.deleteItemAsync(key);
