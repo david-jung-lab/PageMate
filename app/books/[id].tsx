@@ -2,7 +2,7 @@ import React from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
   Image, StyleSheet, SafeAreaView, StatusBar, ActivityIndicator,
-  Alert,
+  Alert, Platform,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -39,7 +39,14 @@ export default function BookDetailScreen() {
     mutationFn: () => exchangeApi.createExchange(Number(id)),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['exchanges'] });
-      Alert.alert('교환 요청 완료', '상대방의 수락을 기다려 주세요.');
+      if (Platform.OS === 'web') {
+        window.alert('교환 요청이 완료됐어요! 상대방의 수락을 기다려 주세요.');
+        router.push('/(tabs)/swap' as any);
+      } else {
+        Alert.alert('교환 요청 완료', '상대방의 수락을 기다려 주세요.', [
+          { text: '확인', onPress: () => router.push('/(tabs)/swap' as any) },
+        ]);
+      }
     },
     onError: (err: any) => {
       const code = err?.response?.data?.error?.code;
@@ -48,15 +55,25 @@ export default function BookDetailScreen() {
         code === 'BOOK_NOT_AVAILABLE' ? '교환할 수 없는 상태의 책이에요.' :
         code === 'SELF_EXCHANGE' ? '내 책에는 교환 요청할 수 없어요.' :
         '교환 요청에 실패했어요.';
-      Alert.alert('오류', msg);
+      if (Platform.OS === 'web') {
+        window.alert(msg);
+      } else {
+        Alert.alert('오류', msg);
+      }
     },
   });
 
   const handleRequestExchange = () => {
-    Alert.alert('교환 요청', `"${book?.title}"에 교환 요청을 보내시겠어요?`, [
-      { text: '취소', style: 'cancel' },
-      { text: '요청하기', onPress: () => exchangeMutation.mutate() },
-    ]);
+    if (Platform.OS === 'web') {
+      if (window.confirm(`"${book?.title}"에 교환 요청을 보내시겠어요?`)) {
+        exchangeMutation.mutate();
+      }
+    } else {
+      Alert.alert('교환 요청', `"${book?.title}"에 교환 요청을 보내시겠어요?`, [
+        { text: '취소', style: 'cancel' },
+        { text: '요청하기', onPress: () => exchangeMutation.mutate() },
+      ]);
+    }
   };
 
   if (isLoading) {
@@ -246,11 +263,10 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     overflow: 'hidden',
     flexShrink: 0,
-    shadowColor: '#1A1A2E',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.12,
-    shadowRadius: 12,
-    elevation: 6,
+    ...Platform.select({
+      ios: { shadowColor: '#1A1A2E', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.12, shadowRadius: 12 },
+      android: { elevation: 6 },
+    }),
   },
   coverImg: { width: 140, height: 200, borderRadius: radius.md },
   heroInfo: { flex: 1, justifyContent: 'flex-start', gap: 6 },
