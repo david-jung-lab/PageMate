@@ -14,6 +14,9 @@ import app.pagemate.exchange.dto.CompleteRequest;
 import app.pagemate.exchange.dto.ExchangeCreateRequest;
 import app.pagemate.exchange.dto.ExchangeResponse;
 import app.pagemate.exchange.dto.RespondRequest;
+import app.pagemate.exchange.dto.ScheduleRequest;
+import app.pagemate.notification.NotificationService;
+import app.pagemate.notification.NotificationType;
 import app.pagemate.user.User;
 import app.pagemate.user.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -34,6 +37,7 @@ public class ExchangeService {
     private final UserRepository userRepository;
     private final ChatRoomRepository chatRoomRepository;
     private final MessageRepository messageRepository;
+    private final NotificationService notificationService;
 
     @Transactional
     public ExchangeResponse createExchange(Long requesterId, ExchangeCreateRequest req) {
@@ -60,7 +64,16 @@ public class ExchangeService {
                 .requestedBook(targetBook)
                 .build();
 
-        return ExchangeResponse.of(exchangeRepository.save(exchange));
+        Exchange saved = exchangeRepository.save(exchange);
+
+        notificationService.send(
+                targetBook.getOwner().getId(),
+                NotificationType.EXCHANGE_REQUEST,
+                requester.getNickname() + "님이 교환을 요청했어요.",
+                saved.getId()
+        );
+
+        return ExchangeResponse.of(saved);
     }
 
     public Page<ExchangeResponse> getMyExchanges(Long userId, ExchangeStatus status, int page, int size) {
@@ -123,17 +136,32 @@ public class ExchangeService {
                         Message sysMsg = messageRepository.save(Message.builder()
                                 .chatRoom(newRoom)
                                 .sender(null)
-                                .content("교환이 수락되었어요. 만남 장소를 정해보세요!")
+                                .content("교환이 수락되었어요. 약속문에 동의한 후 만남 장소를 정해보세요!")
                                 .messageType(MessageType.SYSTEM)
                                 .build());
                         newRoom.updateLastMessage(sysMsg.getContent());
                         return newRoom;
                     });
 
+            notificationService.send(
+                    exchange.getRequester().getId(),
+                    NotificationType.EXCHANGE_ACCEPTED,
+                    exchange.getRespondent().getNickname() + "님이 교환을 수락했어요.",
+                    exchangeId
+            );
+
             return ExchangeResponse.of(exchange, room.getId());
 
         } else if ("REJECT".equals(req.getAction())) {
             exchange.reject();
+
+            notificationService.send(
+                    exchange.getRequester().getId(),
+                    NotificationType.EXCHANGE_REJECTED,
+                    exchange.getRespondent().getNickname() + "님이 교환을 거절했어요.",
+                    exchangeId
+            );
+
             return ExchangeResponse.of(exchange);
 
         } else {
@@ -141,8 +169,9 @@ public class ExchangeService {
         }
     }
 
+    // WF7: 약속문 동의 - ACCEPTED 상태에서 양측이 순서대로 동의 → 둘 다 동의 시 PLEDGED
     @Transactional
-    public ExchangeResponse completeExchange(Long userId, Long exchangeId, CompleteRequest req) {
+    public ExchangeResponse pledgeExchange(Long userId, Long exchangeId) {
         Exchange exchange = getExchangeById(exchangeId);
         checkParticipant(userId, exchange);
 
@@ -150,10 +179,128 @@ public class ExchangeService {
             throw new PagemateException(ErrorCode.BOOK_NOT_AVAILABLE);
         }
 
-        exchange.firstComplete(req.getDurationDays());
-        return ExchangeResponse.of(exchange);
+        boolean isRequester = exchange.getRequester().getId().equals(userId);
+
+        if (isRequester) {
+            if (exchange.isRequesterPledged()) {
+                throw new PagemateException(ErrorCode.VALIDATION_ERROR);
+            }
+            exchange.pledgeByRequester();
+        } else {
+            if (exchange.isRespondentPledged()) {
+                throw new PagemateException(ErrorCode.VALIDATION_ERROR);
+            }
+            exchange.pledgeByRespondent();
+        }
+
+        Long partnerId = isRequester ? exchange.getRespondent().getId() : exchange.getRequester().getId();
+        String myNickname = isRequester ? exchange.getRequester().getNickname() : exchange.getRespondent().getNickname();
+
+        if (exchange.getStatus() == ExchangeStatus.PLEDGED) {
+            // 양측 모두 동의 → 시스템 메시지 + 양측 알림
+            chatRoomRepository.findByExchangeId(exchangeId).ifPresent(room -> {
+                Message sysMsg = messageRepository.save(Message.builder()
+                        .chatRoom(room)
+                        .sender(null)
+                        .content("두 분 모두 약속문에 동의했어요. 만남 일정을 정해보세요!")
+                        .messageType(MessageType.SYSTEM)
+                        .build());
+                room.updateLastMessage(sysMsg.getContent());
+            });
+            notificationService.send(exchange.getRequester().getId(), NotificationType.PLEDGE_REQUESTED,
+                    "약속문 동의가 완료됐어요. 만남 일정을 잡아보세요!", exchangeId);
+            notificationService.send(exchange.getRespondent().getId(), NotificationType.PLEDGE_REQUESTED,
+                    "약속문 동의가 완료됐어요. 만남 일정을 잡아보세요!", exchangeId);
+        } else {
+            // 한 명만 동의 → 상대방에게 알림
+            notificationService.send(partnerId, NotificationType.PLEDGE_REQUESTED,
+                    myNickname + "님이 약속문에 동의했어요.", exchangeId);
+        }
+
+        return toResponse(exchange);
     }
 
+    // WF8: 일정 확정 - PLEDGED 상태에서 날짜/장소 입력 → SCHEDULED
+    @Transactional
+    public ExchangeResponse scheduleExchange(Long userId, Long exchangeId, ScheduleRequest req) {
+        Exchange exchange = getExchangeById(exchangeId);
+        checkParticipant(userId, exchange);
+
+        if (exchange.getStatus() != ExchangeStatus.PLEDGED) {
+            throw new PagemateException(ErrorCode.BOOK_NOT_AVAILABLE);
+        }
+
+        exchange.schedule(req.getExchangeDate(), req.getPlace());
+
+        chatRoomRepository.findByExchangeId(exchangeId).ifPresent(room -> {
+            String content = req.getExchangeDate() + " " + req.getPlace() + "에서 교환하기로 했어요!";
+            Message sysMsg = messageRepository.save(Message.builder()
+                    .chatRoom(room)
+                    .sender(null)
+                    .content(content)
+                    .messageType(MessageType.SYSTEM)
+                    .build());
+            room.updateLastMessage(sysMsg.getContent());
+        });
+
+        return toResponse(exchange);
+    }
+
+    // WF9: 1차 교환 완료 - SCHEDULED 상태에서 양측이 각각 확인 → 둘 다 확인 시 FIRST_EXCHANGED
+    @Transactional
+    public ExchangeResponse completeExchange(Long userId, Long exchangeId, CompleteRequest req) {
+        Exchange exchange = getExchangeById(exchangeId);
+        checkParticipant(userId, exchange);
+
+        if (exchange.getStatus() != ExchangeStatus.SCHEDULED) {
+            throw new PagemateException(ErrorCode.BOOK_NOT_AVAILABLE);
+        }
+
+        boolean isRequester = exchange.getRequester().getId().equals(userId);
+
+        if (isRequester) {
+            if (exchange.isRequesterFirstConfirmed()) {
+                throw new PagemateException(ErrorCode.VALIDATION_ERROR);
+            }
+            exchange.confirmFirstByRequester();
+        } else {
+            if (exchange.isRespondentFirstConfirmed()) {
+                throw new PagemateException(ErrorCode.VALIDATION_ERROR);
+            }
+            exchange.confirmFirstByRespondent();
+        }
+
+        Long partnerId = isRequester ? exchange.getRespondent().getId() : exchange.getRequester().getId();
+        String myNickname = isRequester ? exchange.getRequester().getNickname() : exchange.getRespondent().getNickname();
+
+        if (exchange.isFirstFullyConfirmed()) {
+            // 양측 모두 확인 → 상태 전환 + 반납 기한 설정 + 시스템 메시지 + 양측 알림
+            exchange.firstComplete(req.getDurationDays());
+
+            chatRoomRepository.findByExchangeId(exchangeId).ifPresent(room -> {
+                String content = "1차 교환이 완료됐어요. " + exchange.getDueDate() + "까지 책을 읽고 다시 만나요!";
+                Message sysMsg = messageRepository.save(Message.builder()
+                        .chatRoom(room)
+                        .sender(null)
+                        .content(content)
+                        .messageType(MessageType.SYSTEM)
+                        .build());
+                room.updateLastMessage(sysMsg.getContent());
+            });
+            notificationService.send(exchange.getRequester().getId(), NotificationType.EXCHANGE_COMPLETED,
+                    "1차 교환이 완료됐어요. " + exchange.getDueDate() + "까지 책을 읽어보세요!", exchangeId);
+            notificationService.send(exchange.getRespondent().getId(), NotificationType.EXCHANGE_COMPLETED,
+                    "1차 교환이 완료됐어요. " + exchange.getDueDate() + "까지 책을 읽어보세요!", exchangeId);
+        } else {
+            // 한 명만 확인 → 상대방에게 확인 알림
+            notificationService.send(partnerId, NotificationType.EXCHANGE_COMPLETED,
+                    myNickname + "님이 1차 교환을 확인했어요. 만남 후 교환을 완료해주세요!", exchangeId);
+        }
+
+        return toResponse(exchange);
+    }
+
+    // WF11: 2차 교환 완료 - FIRST_EXCHANGED 상태에서 양측이 각각 확인 → 둘 다 확인 시 SECOND_EXCHANGED
     @Transactional
     public ExchangeResponse completeSecondExchange(Long userId, Long exchangeId) {
         Exchange exchange = getExchangeById(exchangeId);
@@ -163,12 +310,51 @@ public class ExchangeService {
             throw new PagemateException(ErrorCode.BOOK_NOT_AVAILABLE);
         }
 
-        exchange.secondComplete();
-        exchange.getRequestedBook().updateStatus(BookStatus.COMPLETED);
-        if (exchange.getSelectedBook() != null) {
-            exchange.getSelectedBook().updateStatus(BookStatus.COMPLETED);
+        boolean isRequester = exchange.getRequester().getId().equals(userId);
+
+        if (isRequester) {
+            if (exchange.isRequesterSecondConfirmed()) {
+                throw new PagemateException(ErrorCode.VALIDATION_ERROR);
+            }
+            exchange.confirmSecondByRequester();
+        } else {
+            if (exchange.isRespondentSecondConfirmed()) {
+                throw new PagemateException(ErrorCode.VALIDATION_ERROR);
+            }
+            exchange.confirmSecondByRespondent();
         }
-        return ExchangeResponse.of(exchange);
+
+        Long partnerId = isRequester ? exchange.getRespondent().getId() : exchange.getRequester().getId();
+        String myNickname = isRequester ? exchange.getRequester().getNickname() : exchange.getRespondent().getNickname();
+
+        if (exchange.isSecondFullyConfirmed()) {
+            // 양측 모두 확인 → 상태 전환 + 도서 상태 갱신 + 시스템 메시지 + WF12 평가 요청 알림
+            exchange.secondComplete();
+            exchange.getRequestedBook().updateStatus(BookStatus.COMPLETED);
+            if (exchange.getSelectedBook() != null) {
+                exchange.getSelectedBook().updateStatus(BookStatus.COMPLETED);
+            }
+
+            chatRoomRepository.findByExchangeId(exchangeId).ifPresent(room -> {
+                Message sysMsg = messageRepository.save(Message.builder()
+                        .chatRoom(room)
+                        .sender(null)
+                        .content("교환독서가 모두 완료됐어요. 서로를 평가해보세요!")
+                        .messageType(MessageType.SYSTEM)
+                        .build());
+                room.updateLastMessage(sysMsg.getContent());
+            });
+            notificationService.send(exchange.getRequester().getId(), NotificationType.REVIEW_REQUESTED,
+                    "교환독서가 완료됐어요. " + exchange.getRespondent().getNickname() + "님을 평가해주세요!", exchangeId);
+            notificationService.send(exchange.getRespondent().getId(), NotificationType.REVIEW_REQUESTED,
+                    "교환독서가 완료됐어요. " + exchange.getRequester().getNickname() + "님을 평가해주세요!", exchangeId);
+        } else {
+            // 한 명만 확인 → 상대방에게 확인 알림
+            notificationService.send(partnerId, NotificationType.EXCHANGE_COMPLETED,
+                    myNickname + "님이 2차 교환을 확인했어요. 책을 돌려받은 뒤 완료해주세요!", exchangeId);
+        }
+
+        return toResponse(exchange);
     }
 
     @Transactional

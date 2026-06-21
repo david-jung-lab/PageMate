@@ -16,6 +16,14 @@ public record ExchangeResponse(
         String status,
         Long chatRoomId,
         LocalDate dueDate,
+        LocalDate firstExchangeDate,
+        String firstExchangePlace,
+        boolean requesterPledged,
+        boolean respondentPledged,
+        boolean requesterFirstConfirmed,
+        boolean respondentFirstConfirmed,
+        boolean requesterSecondConfirmed,
+        boolean respondentSecondConfirmed,
         LocalDateTime createdAt
 ) {
     public record BookInfo(
@@ -57,6 +65,14 @@ public record ExchangeResponse(
                 e.getStatus().name(),
                 null,
                 e.getDueDate(),
+                e.getFirstExchangeDate(),
+                e.getFirstExchangePlace(),
+                e.isRequesterPledged(),
+                e.isRespondentPledged(),
+                e.isRequesterFirstConfirmed(),
+                e.isRespondentFirstConfirmed(),
+                e.isRequesterSecondConfirmed(),
+                e.isRespondentSecondConfirmed(),
                 e.getCreatedAt()
         );
     }
@@ -71,6 +87,14 @@ public record ExchangeResponse(
                 e.getStatus().name(),
                 chatRoomId,
                 e.getDueDate(),
+                e.getFirstExchangeDate(),
+                e.getFirstExchangePlace(),
+                e.isRequesterPledged(),
+                e.isRespondentPledged(),
+                e.isRequesterFirstConfirmed(),
+                e.isRespondentFirstConfirmed(),
+                e.isRequesterSecondConfirmed(),
+                e.isRespondentSecondConfirmed(),
                 e.getCreatedAt()
         );
     }

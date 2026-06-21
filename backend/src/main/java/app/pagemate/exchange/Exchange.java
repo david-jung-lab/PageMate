@@ -54,6 +54,36 @@ public class Exchange {
     @Column(name = "due_date")
     private LocalDate dueDate;
 
+    @Column(name = "requester_pledged", nullable = false)
+    @Builder.Default
+    private boolean requesterPledged = false;
+
+    @Column(name = "respondent_pledged", nullable = false)
+    @Builder.Default
+    private boolean respondentPledged = false;
+
+    @Column(name = "first_exchange_date")
+    private LocalDate firstExchangeDate;
+
+    @Column(name = "first_exchange_place", length = 200)
+    private String firstExchangePlace;
+
+    @Column(name = "requester_first_confirmed", nullable = false)
+    @Builder.Default
+    private boolean requesterFirstConfirmed = false;
+
+    @Column(name = "respondent_first_confirmed", nullable = false)
+    @Builder.Default
+    private boolean respondentFirstConfirmed = false;
+
+    @Column(name = "requester_second_confirmed", nullable = false)
+    @Builder.Default
+    private boolean requesterSecondConfirmed = false;
+
+    @Column(name = "respondent_second_confirmed", nullable = false)
+    @Builder.Default
+    private boolean respondentSecondConfirmed = false;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -66,12 +96,48 @@ public class Exchange {
         this.status = ExchangeStatus.ACCEPTED;
         this.selectedBook = selectedBook;
     }
-    public void reject()   { this.status = ExchangeStatus.REJECTED; }
+
+    public void reject() { this.status = ExchangeStatus.REJECTED; }
+
+    public void pledgeByRequester() {
+        this.requesterPledged = true;
+        if (this.respondentPledged) {
+            this.status = ExchangeStatus.PLEDGED;
+        }
+    }
+
+    public void pledgeByRespondent() {
+        this.respondentPledged = true;
+        if (this.requesterPledged) {
+            this.status = ExchangeStatus.PLEDGED;
+        }
+    }
+
+    public void schedule(LocalDate exchangeDate, String place) {
+        this.firstExchangeDate = exchangeDate;
+        this.firstExchangePlace = place;
+        this.status = ExchangeStatus.SCHEDULED;
+    }
+
+    // WF9: 1차 교환 완료 확인 (양측 confirmed 필요)
+    public void confirmFirstByRequester()  { this.requesterFirstConfirmed = true; }
+    public void confirmFirstByRespondent() { this.respondentFirstConfirmed = true; }
+    public boolean isFirstFullyConfirmed() { return requesterFirstConfirmed && respondentFirstConfirmed; }
+
     public void firstComplete(int durationDays) {
         this.status = ExchangeStatus.FIRST_EXCHANGED;
         this.completedAt = LocalDateTime.now();
         this.dueDate = LocalDate.now().plusDays(durationDays);
     }
-    public void secondComplete() { this.status = ExchangeStatus.COMPLETED; }
-    public void cancel()   { this.status = ExchangeStatus.CANCELLED; }
+
+    // WF11: 2차 교환 완료 확인 (양측 confirmed 필요)
+    public void confirmSecondByRequester()  { this.requesterSecondConfirmed = true; }
+    public void confirmSecondByRespondent() { this.respondentSecondConfirmed = true; }
+    public boolean isSecondFullyConfirmed() { return requesterSecondConfirmed && respondentSecondConfirmed; }
+
+    public void secondComplete() { this.status = ExchangeStatus.SECOND_EXCHANGED; }
+
+    public void complete() { this.status = ExchangeStatus.COMPLETED; }
+
+    public void cancel() { this.status = ExchangeStatus.CANCELLED; }
 }

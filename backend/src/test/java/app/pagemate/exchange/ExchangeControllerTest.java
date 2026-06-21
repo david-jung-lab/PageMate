@@ -265,7 +265,7 @@ class ExchangeControllerTest {
     }
 
     @Test
-    @DisplayName("PATCH /exchanges/{id}/complete - 수락 후 완료")
+    @DisplayName("PATCH /exchanges/{id}/complete - 약속·일정 후 양측 확인 시 1차 교환 완료")
     void completeExchange() throws Exception {
         String createResult = mockMvc.perform(post("/exchanges")
                         .header("Authorization", "Bearer " + requesterToken)
@@ -276,14 +276,42 @@ class ExchangeControllerTest {
 
         Long exchangeId = objectMapper.readTree(createResult).path("data").path("id").asLong();
 
+        // 수락
         mockMvc.perform(patch("/exchanges/{id}/respond", exchangeId)
                         .header("Authorization", "Bearer " + respondentToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body(Map.of("action", "ACCEPT", "selectedBookId", requesterBookId))))
                 .andExpect(status().isOk());
 
+        // WF7: 양측 약속문 동의 → PLEDGED
+        mockMvc.perform(post("/exchanges/{id}/pledge", exchangeId)
+                        .header("Authorization", "Bearer " + requesterToken))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/exchanges/{id}/pledge", exchangeId)
+                        .header("Authorization", "Bearer " + respondentToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("PLEDGED"));
+
+        // WF8: 일정 확정 → SCHEDULED
+        mockMvc.perform(patch("/exchanges/{id}/schedule", exchangeId)
+                        .header("Authorization", "Bearer " + requesterToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body(Map.of("exchangeDate", "2026-07-01", "place", "홍대입구역 2번 출구"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("SCHEDULED"));
+
+        // WF9: 한쪽만 확인 → 아직 SCHEDULED 유지
         mockMvc.perform(patch("/exchanges/{id}/complete", exchangeId)
                         .header("Authorization", "Bearer " + requesterToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body(Map.of("durationDays", 7))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("SCHEDULED"))
+                .andExpect(jsonPath("$.data.requesterFirstConfirmed").value(true));
+
+        // WF9: 양측 모두 확인 → FIRST_EXCHANGED + dueDate
+        mockMvc.perform(patch("/exchanges/{id}/complete", exchangeId)
+                        .header("Authorization", "Bearer " + respondentToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body(Map.of("durationDays", 7))))
                 .andDo(print())
