@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View, Text, FlatList, TextInput, TouchableOpacity,
   StyleSheet, SafeAreaView, StatusBar, KeyboardAvoidingView,
@@ -101,7 +101,6 @@ export default function ChatRoomScreen() {
   const accessToken = useAuthStore(s => s.accessToken);
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const listRef = useRef<FlatList>(null);
   const myUserId = useAuthStore(s => s.accessToken)
     ? Number(JSON.parse(atob(accessToken!.split('.')[1])).sub)
     : null;
@@ -138,7 +137,7 @@ export default function ChatRoomScreen() {
     }
   }, [myUserId, roomId]);
 
-  const { sendMessage } = useStompChat({
+  const { sendMessage, isConnected } = useStompChat({
     roomId: Number(roomId),
     token: accessToken,
     onMessage: handleNewMessage,
@@ -188,23 +187,22 @@ export default function ChatRoomScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={0}
       >
-        {/* 메시지 목록 */}
+        {/* 메시지 목록 — inverted: 최신 메시지가 항상 하단에 고정 */}
         <FlatList
-          ref={listRef}
-          data={messages}
+          data={[...messages].reverse()}
+          inverted
           keyExtractor={m => String(m.id)}
           renderItem={({ item }) => (
             <Bubble msg={item} isMe={item.senderId === myUserId} />
           )}
           contentContainerStyle={styles.listContent}
-          onStartReached={loadMore}
-          onStartReachedThreshold={0.2}
-          ListHeaderComponent={
+          onEndReached={loadMore}
+          onEndReachedThreshold={0.2}
+          ListFooterComponent={
             isFetchingNextPage ? (
               <ActivityIndicator size="small" color={colors.primary} style={{ marginVertical: 8 }} />
             ) : null
           }
-          onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: false })}
           showsVerticalScrollIndicator={false}
         />
 
@@ -214,7 +212,7 @@ export default function ChatRoomScreen() {
             style={styles.textInput}
             value={input}
             onChangeText={setInput}
-            placeholder="메시지를 입력하세요"
+            placeholder={isConnected ? '메시지를 입력하세요' : '연결 중...'}
             placeholderTextColor={colors.textTertiary}
             multiline
             maxLength={500}
@@ -223,10 +221,10 @@ export default function ChatRoomScreen() {
             blurOnSubmit={false}
           />
           <TouchableOpacity
-            style={[styles.sendBtn, !input.trim() && styles.sendBtnDisabled]}
+            style={[styles.sendBtn, (!input.trim() || !isConnected) && styles.sendBtnDisabled]}
             onPress={handleSend}
             activeOpacity={0.8}
-            disabled={!input.trim()}
+            disabled={!input.trim() || !isConnected}
           >
             <PMIcon name="send" size={18} color="#fff" />
           </TouchableOpacity>
