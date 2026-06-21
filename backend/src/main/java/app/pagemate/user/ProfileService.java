@@ -113,7 +113,7 @@ public class ProfileService {
             throw new PagemateException(ErrorCode.USER_NOT_FOUND);
         }
         return BookPageResponse.of(
-                bookQueryRepository.findMyBooks(targetId, BookStatus.AVAILABLE, PageRequest.of(page, size)),
+                bookQueryRepository.findMyBooks(targetId, null, PageRequest.of(page, size)),
                 b -> BookSummaryResponse.of(b)
         );
     }
