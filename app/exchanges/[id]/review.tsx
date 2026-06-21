@@ -54,9 +54,14 @@ export default function ReviewScreen() {
   const reviewMutation = useMutation({
     mutationFn: () => reviewApi.createReview(Number(id), rating, comment.trim() || undefined),
     onSuccess: () => {
-      Alert.alert('평가 완료', `${partnerNickname}님께 평가를 남겼어요.`, [
-        { text: '확인', onPress: () => router.replace('/(tabs)/swap' as any) },
-      ]);
+      if (Platform.OS === 'web') {
+        window.alert(`${partnerNickname}님께 평가를 남겼어요.`);
+        router.replace('/(tabs)/swap' as any);
+      } else {
+        Alert.alert('평가 완료', `${partnerNickname}님께 평가를 남겼어요.`, [
+          { text: '확인', onPress: () => router.replace('/(tabs)/swap' as any) },
+        ]);
+      }
     },
     onError: (err: any) => {
       const code = err?.response?.data?.error?.code;

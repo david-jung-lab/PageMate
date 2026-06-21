@@ -29,3 +29,12 @@ export interface MessageCursorResponse {
   nextCursor: number | null;
   hasMore: boolean;
 }
+
+export interface ExchangeSummary {
+  exchangeId: number;
+  status: string;
+  firstExchangeDate: string | null;
+  firstExchangePlace: string | null;
+  /** 반납(2차 교환) 기한 — 1차 교환 완료 시 설정 */
+  secondExchangeDueDate: string | null;
+}

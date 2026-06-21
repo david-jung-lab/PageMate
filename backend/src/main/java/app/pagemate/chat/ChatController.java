@@ -37,6 +37,13 @@ public class ChatController {
         return ApiResponse.ok(chatService.getMessages(userId, roomId, cursor, size));
     }
 
+    @GetMapping("/rooms/{roomId}/exchange")
+    public ApiResponse<ExchangeSummaryResponse> getRoomExchange(
+            @AuthenticationPrincipal Long userId,
+            @PathVariable Long roomId) {
+        return ApiResponse.ok(chatService.getRoomExchange(userId, roomId));
+    }
+
     @PatchMapping("/rooms/{roomId}/read")
     public ApiResponse<Void> markAsRead(
             @AuthenticationPrincipal Long userId,

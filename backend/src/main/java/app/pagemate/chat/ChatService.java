@@ -5,6 +5,7 @@ import app.pagemate.book.BookRepository;
 import app.pagemate.chat.dto.*;
 import app.pagemate.common.exception.ErrorCode;
 import app.pagemate.common.exception.PagemateException;
+import app.pagemate.exchange.Exchange;
 import app.pagemate.user.User;
 import app.pagemate.user.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -104,6 +105,17 @@ public class ChatService {
         MessageResponse response = MessageResponse.of(message);
         messagingTemplate.convertAndSend("/topic/chat/" + roomId, response);
         return response;
+    }
+
+    /** 채팅방에 연결된 교환 정보 요약 (상단 배너용). 연결된 교환이 없으면 null. */
+    public ExchangeSummaryResponse getRoomExchange(Long userId, Long roomId) {
+        ChatRoom room = chatRoomRepository.findById(roomId)
+                .orElseThrow(() -> new PagemateException(ErrorCode.CHAT_ROOM_NOT_FOUND));
+        if (!room.isParticipant(userId)) {
+            throw new PagemateException(ErrorCode.CHAT_ACCESS_DENIED);
+        }
+        Exchange exchange = room.getExchange();
+        return exchange == null ? null : ExchangeSummaryResponse.of(exchange);
     }
 
     @Transactional

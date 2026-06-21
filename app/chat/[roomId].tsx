@@ -5,17 +5,37 @@ import {
   Platform, ActivityIndicator,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { colors, spacing, radius, fontSize } from '@/theme/tokens';
 import PMIcon from '@/components/ui/PMIcon';
 import { chatApi } from '@/features/chat/api';
-import { ChatMessage } from '@/features/chat/types';
+import { ChatMessage, ExchangeSummary } from '@/features/chat/types';
 import { useAuthStore } from '@/store/index';
 import { useStompChat } from '@/hooks/useStompChat';
 
 function formatTime(iso: string) {
   const d = new Date(iso);
   return d.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false });
+}
+
+function dDayLabel(dateStr: string): string {
+  const days = Math.ceil((new Date(dateStr).getTime() - Date.now()) / 86400000);
+  return days > 0 ? `D-${days}` : days === 0 ? 'D-day' : '기한 초과';
+}
+
+// 진행 단계에 맞는 상단 배너 문구. 표시할 일정이 없으면 null.
+function buildExchangeBanner(e: ExchangeSummary | null | undefined): string | null {
+  if (!e) return null;
+  const place = e.firstExchangePlace ? ` · ${e.firstExchangePlace}` : '';
+  // 1차 교환 완료 후: 반납(2차 교환) 기한 우선 표시
+  if (e.secondExchangeDueDate) {
+    return `📅 2차 교환(반납) ${dDayLabel(e.secondExchangeDueDate)}${place}`;
+  }
+  // 일정 확정 후 1차 교환 전
+  if (e.firstExchangeDate) {
+    return `📅 1차 교환 ${dDayLabel(e.firstExchangeDate)}${place}`;
+  }
+  return null;
 }
 
 function SystemBubble({ content }: { content: string }) {
@@ -123,6 +143,14 @@ export default function ChatRoomScreen() {
     setMessages(flat);
   }, [data]);
 
+  // 상단 고정 배너용 교환 정보
+  const { data: exchangeSummary } = useQuery({
+    queryKey: ['chat-exchange', roomId],
+    queryFn: () => chatApi.getRoomExchange(Number(roomId)),
+    staleTime: 60 * 1000,
+  });
+  const banner = buildExchangeBanner(exchangeSummary);
+
   // 읽음 처리
   useEffect(() => {
     chatApi.markAsRead(Number(roomId)).catch(() => {});
@@ -181,6 +209,13 @@ export default function ChatRoomScreen() {
         <Text style={styles.headerTitle}>채팅</Text>
         <View style={{ width: 36 }} />
       </View>
+
+      {/* 교환 일정 고정 배너 */}
+      {banner && (
+        <View style={styles.exchangeBanner}>
+          <Text style={styles.exchangeBannerText} numberOfLines={1}>{banner}</Text>
+        </View>
+      )}
 
       <KeyboardAvoidingView
         style={{ flex: 1 }}
@@ -246,6 +281,15 @@ const styles = StyleSheet.create({
     transform: [{ rotate: '180deg' }],
   },
   headerTitle: { fontSize: 15, fontWeight: '700', color: colors.text },
+
+  exchangeBanner: {
+    backgroundColor: colors.primarySoft,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    paddingHorizontal: spacing.s4,
+    paddingVertical: 10,
+  },
+  exchangeBannerText: { fontSize: 13, fontWeight: '600', color: colors.primary, letterSpacing: -0.2 },
 
   listContent: { paddingHorizontal: spacing.s4, paddingVertical: 12, gap: 2 },
 

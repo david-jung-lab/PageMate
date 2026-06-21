@@ -15,6 +15,9 @@ const TYPE_LABEL: Record<NotificationType, string> = {
   EXCHANGE_REJECTED: '교환 거절',
   EXCHANGE_COMPLETED: '교환 완료',
   CHAT_MESSAGE: '새 메시지',
+  PLEDGE_REQUESTED: '약속문 동의',
+  SECOND_DUE: '반납 기한 알림',
+  REVIEW_REQUESTED: '평가 요청',
 };
 
 const TYPE_ICON: Record<NotificationType, 'swap' | 'chat'> = {
@@ -23,12 +26,16 @@ const TYPE_ICON: Record<NotificationType, 'swap' | 'chat'> = {
   EXCHANGE_REJECTED: 'swap',
   EXCHANGE_COMPLETED: 'swap',
   CHAT_MESSAGE: 'chat',
+  PLEDGE_REQUESTED: 'swap',
+  SECOND_DUE: 'swap',
+  REVIEW_REQUESTED: 'swap',
 };
 
 type Tab = 'all' | 'exchange' | 'message' | 'system';
 
 const EXCHANGE_TYPES: NotificationType[] = [
   'EXCHANGE_REQUEST', 'EXCHANGE_ACCEPTED', 'EXCHANGE_REJECTED', 'EXCHANGE_COMPLETED',
+  'PLEDGE_REQUESTED', 'SECOND_DUE', 'REVIEW_REQUESTED',
 ];
 const MESSAGE_TYPES: NotificationType[] = ['CHAT_MESSAGE'];
 
@@ -82,8 +89,17 @@ export default function NotificationsScreen() {
       router.push(`/exchanges/${item.referenceId}/agreement` as any);
     } else if (item.type === 'EXCHANGE_COMPLETED' && item.referenceId) {
       router.push(`/exchanges/${item.referenceId}/review` as any);
-    } else if (item.referenceId) {
-      router.push(`/exchanges/${item.referenceId}` as any);
+    } else if (item.type === 'PLEDGE_REQUESTED' && item.referenceId) {
+      router.push(`/exchanges/${item.referenceId}/agreement` as any);
+    } else if (item.type === 'REVIEW_REQUESTED' && item.referenceId) {
+      router.push(`/exchanges/${item.referenceId}/review` as any);
+    } else if (item.type === 'SECOND_DUE' && item.referenceId) {
+      router.push('/(tabs)/swap' as any);
+    } else if (item.type === 'EXCHANGE_REJECTED') {
+      router.push('/(tabs)/swap' as any);
+    } else {
+      // 미정의 타입 또는 referenceId 없음 → 교환 탭으로 안전하게 이동
+      router.push('/(tabs)/swap' as any);
     }
   };
 

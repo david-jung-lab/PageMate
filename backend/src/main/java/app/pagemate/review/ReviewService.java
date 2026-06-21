@@ -23,12 +23,13 @@ public class ReviewService {
     private final ExchangeRepository exchangeRepository;
     private final UserRepository userRepository;
 
+    // WF12: 사용자 평가 - SECOND_EXCHANGED 상태에서 리뷰 가능, 양측 완료 시 COMPLETED
     @Transactional
     public ReviewResponse createReview(Long reviewerId, Long exchangeId, ReviewCreateRequest req) {
         Exchange exchange = exchangeRepository.findById(exchangeId)
                 .orElseThrow(() -> new PagemateException(ErrorCode.EXCHANGE_NOT_FOUND));
 
-        if (exchange.getStatus() != ExchangeStatus.COMPLETED) {
+        if (exchange.getStatus() != ExchangeStatus.SECOND_EXCHANGED) {
             throw new PagemateException(ErrorCode.BOOK_NOT_AVAILABLE);
         }
 
@@ -53,6 +54,15 @@ public class ReviewService {
                 .rating(req.getRating())
                 .comment(req.getComment())
                 .build());
+
+        // 양측 모두 평가 완료 시 교환 상태를 COMPLETED로 전환
+        boolean requesterReviewed = reviewRepository.existsByExchangeIdAndReviewerId(
+                exchangeId, exchange.getRequester().getId());
+        boolean respondentReviewed = reviewRepository.existsByExchangeIdAndReviewerId(
+                exchangeId, exchange.getRespondent().getId());
+        if (requesterReviewed && respondentReviewed) {
+            exchange.complete();
+        }
 
         return ReviewResponse.of(review);
     }

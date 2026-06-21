@@ -1,5 +1,5 @@
 import { api } from '@/lib/api';
-import { ChatRoom, MessageCursorResponse } from './types';
+import { ChatRoom, ExchangeSummary, MessageCursorResponse } from './types';
 
 export const chatApi = {
   createRoom: (bookId: number) =>
@@ -15,4 +15,7 @@ export const chatApi = {
 
   markAsRead: (roomId: number) =>
     api.patch(`/chat/rooms/${roomId}/read`),
+
+  getRoomExchange: (roomId: number) =>
+    api.get<{ data: ExchangeSummary | null }>(`/chat/rooms/${roomId}/exchange`).then(r => r.data.data),
 };

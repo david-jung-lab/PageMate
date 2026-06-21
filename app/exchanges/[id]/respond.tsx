@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity,
-  StyleSheet, SafeAreaView, StatusBar, ActivityIndicator, Alert,
+  StyleSheet, SafeAreaView, StatusBar, ActivityIndicator, Alert, Platform,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -56,21 +56,29 @@ export default function RespondScreen() {
       Alert.alert('책 선택', '교환할 내 책을 선택해 주세요.');
       return;
     }
-    Alert.alert('교환 수락', '이 책으로 교환을 수락하시겠어요?', [
-      { text: '취소', style: 'cancel' },
-      { text: '수락', onPress: () => respondMutation.mutate({ action: 'ACCEPT', selectedBookId }) },
-    ]);
+    if (Platform.OS === 'web') {
+      if (window.confirm('이 책으로 교환을 수락하시겠어요?')) {
+        respondMutation.mutate({ action: 'ACCEPT', selectedBookId });
+      }
+    } else {
+      Alert.alert('교환 수락', '이 책으로 교환을 수락하시겠어요?', [
+        { text: '취소', style: 'cancel' },
+        { text: '수락', onPress: () => respondMutation.mutate({ action: 'ACCEPT', selectedBookId }) },
+      ]);
+    }
   };
 
   const handleReject = () => {
-    Alert.alert('교환 거절', '교환 요청을 거절하시겠어요?', [
-      { text: '취소', style: 'cancel' },
-      {
-        text: '거절',
-        style: 'destructive',
-        onPress: () => respondMutation.mutate({ action: 'REJECT' }),
-      },
-    ]);
+    if (Platform.OS === 'web') {
+      if (window.confirm('교환 요청을 거절하시겠어요?')) {
+        respondMutation.mutate({ action: 'REJECT' });
+      }
+    } else {
+      Alert.alert('교환 거절', '교환 요청을 거절하시겠어요?', [
+        { text: '취소', style: 'cancel' },
+        { text: '거절', style: 'destructive', onPress: () => respondMutation.mutate({ action: 'REJECT' }) },
+      ]);
+    }
   };
 
   const isLoading = exchangeLoading || booksLoading;

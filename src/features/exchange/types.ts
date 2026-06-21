@@ -1,4 +1,13 @@
-export type ExchangeStatus = 'PENDING' | 'ACCEPTED' | 'FIRST_EXCHANGED' | 'REJECTED' | 'COMPLETED' | 'CANCELLED';
+export type ExchangeStatus =
+  | 'PENDING'
+  | 'ACCEPTED'
+  | 'PLEDGED'
+  | 'SCHEDULED'
+  | 'FIRST_EXCHANGED'
+  | 'SECOND_EXCHANGED'
+  | 'REJECTED'
+  | 'COMPLETED'
+  | 'CANCELLED';
 
 export interface ExchangeBookInfo {
   id: number;
@@ -26,6 +35,14 @@ export interface Exchange {
   status: ExchangeStatus;
   chatRoomId: number | null;
   dueDate: string | null;
+  firstExchangeDate: string | null;
+  firstExchangePlace: string | null;
+  requesterPledged: boolean;
+  respondentPledged: boolean;
+  requesterFirstConfirmed: boolean;
+  respondentFirstConfirmed: boolean;
+  requesterSecondConfirmed: boolean;
+  respondentSecondConfirmed: boolean;
   createdAt: string;
 }
 
