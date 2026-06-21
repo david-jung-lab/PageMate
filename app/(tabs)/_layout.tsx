@@ -1,7 +1,5 @@
-import { useEffect } from 'react';
 import { Tabs, usePathname, useRouter } from 'expo-router';
 import PMTabBar from '../../src/components/ui/PMTabBar';
-import { useAuthStore } from '../../src/store';
 
 type TabId = 'home' | 'search' | 'swap' | 'chat' | 'me';
 
@@ -25,13 +23,6 @@ export default function TabLayout() {
   const router = useRouter();
   const pathname = usePathname();
   const active = pathToTab[pathname] ?? 'home';
-  const { isAuthenticated, isHydrated } = useAuthStore();
-
-  useEffect(() => {
-    if (isHydrated && !isAuthenticated) {
-      router.replace('/(auth)/login');
-    }
-  }, [isHydrated, isAuthenticated]);
 
   return (
     <Tabs
