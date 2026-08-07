@@ -53,13 +53,14 @@ public class SecurityConfig {
                 })
             )
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/v1/auth/oauth/**", "/v1/auth/refresh").permitAll()
+                .requestMatchers("/v1/auth/oauth/**", "/v1/auth/refresh", "/v1/auth/demo").permitAll()
                 .requestMatchers("/v1/auth/logout").authenticated()
                 .requestMatchers(HttpMethod.GET, "/books/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/v1/users/me", "/v1/users/me/books").authenticated()
                 .requestMatchers(HttpMethod.GET, "/v1/users/*/books", "/v1/users/*").permitAll()
                 .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/api-docs/**").permitAll()
-                .requestMatchers("/ws/**").permitAll()
+                // 핸드셰이크만 개방하고, 실제 인증·인가는 StompAuthChannelInterceptor 가 프레임 단위로 수행
+                .requestMatchers("/ws/**", "/ws-native/**").permitAll()
                 .anyRequest().authenticated()
             )
             .addFilterBefore(new JwtAuthFilter(jwtProvider),

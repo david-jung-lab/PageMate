@@ -1,4 +1,5 @@
 import { api } from '@/lib/api';
+import { DEMO_LOGIN_KEY } from '@/constants';
 import type { AuthResponse, RefreshResponse } from './types';
 
 interface ApiWrapper<T> {
@@ -20,6 +21,12 @@ export const authApi = {
 
   loginWithKakao: (authorizationCode: string, redirectUri: string) =>
     api.post<ApiWrapper<AuthResponse>>('/v1/auth/oauth/kakao', { authorizationCode, redirectUri }),
+
+  // Apple App Store 심사관용 데모 로그인 (체험 계정)
+  loginDemo: () =>
+    api.post<ApiWrapper<AuthResponse>>('/v1/auth/demo', undefined, {
+      headers: { 'X-Demo-Key': DEMO_LOGIN_KEY },
+    }),
 
   refresh: (refreshToken: string) =>
     api.post<ApiWrapper<RefreshResponse>>('/v1/auth/refresh', { refreshToken }),

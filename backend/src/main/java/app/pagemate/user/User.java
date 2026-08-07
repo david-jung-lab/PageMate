@@ -64,6 +64,10 @@ public class User {
     @Builder.Default
     private boolean isOnboarded = false;
 
+    @Column(name = "push_enabled", nullable = false)
+    @Builder.Default
+    private boolean pushEnabled = true;
+
     @Column(name = "fcm_token")
     private String fcmToken;
 
@@ -75,6 +79,9 @@ public class User {
     @Column(name = "tag", length = 50)
     @Builder.Default
     private List<String> tags = new ArrayList<>();
+
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
@@ -90,6 +97,10 @@ public class User {
 
     public void updateFcmToken(String fcmToken) {
         this.fcmToken = fcmToken;
+    }
+
+    public void updatePushEnabled(boolean pushEnabled) {
+        this.pushEnabled = pushEnabled;
     }
 
     public void updateRefreshToken(String refreshToken) {
@@ -121,5 +132,31 @@ public class User {
     public void updateLocation(BigDecimal lat, BigDecimal lng) {
         this.lat = lat;
         this.lng = lng;
+    }
+
+    public boolean isDeleted() {
+        return this.deletedAt != null;
+    }
+
+    /**
+     * 계정 삭제. 거래·채팅·리뷰 이력이 이 행을 참조하므로 행을 지우지 않고
+     * 개인 식별 정보를 모두 제거한다. oauth_id 를 무효화하므로 같은 소셜 계정으로
+     * 다시 로그인하면 완전히 새로운 계정이 만들어진다.
+     */
+    public void softDelete() {
+        this.oauthId = "deleted:" + this.id;
+        this.email = null;
+        this.nickname = "탈퇴한 사용자";
+        this.handle = "deleted_" + this.id;
+        this.profileImage = null;
+        this.bio = null;
+        this.avatarColor = null;
+        this.location = null;
+        this.lat = null;
+        this.lng = null;
+        this.fcmToken = null;
+        this.refreshToken = null;
+        this.tags.clear();
+        this.deletedAt = LocalDateTime.now();
     }
 }

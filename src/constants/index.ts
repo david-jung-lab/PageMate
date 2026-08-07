@@ -9,6 +9,9 @@ export const GOOGLE_IOS_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID
 export const GOOGLE_ANDROID_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID ?? '';
 export const KAKAO_REST_API_KEY = process.env.EXPO_PUBLIC_KAKAO_REST_API_KEY ?? '';
 
+// App Store 심사관용 체험 로그인 키. 비어 있으면 체험 로그인 버튼을 노출하지 않는다.
+export const DEMO_LOGIN_KEY = process.env.EXPO_PUBLIC_DEMO_LOGIN_KEY ?? '';
+
 export const GENRES = [
   { id: 'novel',      label: '소설' },
   { id: 'essay',      label: '에세이' },

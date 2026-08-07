@@ -21,6 +21,8 @@ public class BookQueryRepository {
         QBook book = QBook.book;
         BooleanBuilder builder = buildFilter(keyword, genre, neighborhood);
         builder.and(book.status.eq(BookStatus.AVAILABLE));
+        // 탈퇴한 사용자의 도서는 대여 목록에 노출하지 않는다
+        builder.and(book.owner.deletedAt.isNull());
 
         List<Book> content = queryFactory.selectFrom(book)
                 .where(builder)

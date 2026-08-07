@@ -7,9 +7,11 @@ import app.pagemate.book.dto.BookSummaryResponse;
 import app.pagemate.book.BookQueryRepository;
 import app.pagemate.common.exception.ErrorCode;
 import app.pagemate.common.exception.PagemateException;
-import app.pagemate.common.service.S3Service;
+import app.pagemate.common.service.ImageStorage;
+import app.pagemate.exchange.Exchange;
 import app.pagemate.exchange.ExchangeRepository;
 import app.pagemate.exchange.ExchangeStatus;
+import app.pagemate.notification.NotificationRepository;
 import app.pagemate.review.ReviewRepository;
 import app.pagemate.user.dto.OnboardRequest;
 import app.pagemate.user.dto.ProfileResponse;
@@ -20,18 +22,30 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class ProfileService {
 
+    /** 아직 끝나지 않아 탈퇴 시 취소해야 하는 대여 상태 */
+    private static final List<ExchangeStatus> ACTIVE_EXCHANGE_STATUSES = List.of(
+            ExchangeStatus.PENDING,
+            ExchangeStatus.ACCEPTED,
+            ExchangeStatus.PLEDGED,
+            ExchangeStatus.SCHEDULED,
+            ExchangeStatus.FIRST_EXCHANGED,
+            ExchangeStatus.SECOND_EXCHANGED
+    );
+
     private final UserRepository userRepository;
     private final BookRepository bookRepository;
     private final BookQueryRepository bookQueryRepository;
-    private final S3Service s3Service;
+    private final ImageStorage imageStorage;
     private final ReviewRepository reviewRepository;
     private final ExchangeRepository exchangeRepository;
+    private final NotificationRepository notificationRepository;
 
     public ProfileResponse getMyProfile(Long userId) {
         User user = userRepository.findById(userId)
@@ -54,9 +68,9 @@ public class ProfileService {
         String imageUrl = null;
         if (req.getImage() != null && !req.getImage().isEmpty()) {
             if (user.getProfileImage() != null) {
-                s3Service.delete(user.getProfileImage());
+                imageStorage.delete(user.getProfileImage());
             }
-            imageUrl = s3Service.upload(req.getImage(), "profiles");
+            imageUrl = imageStorage.upload(req.getImage(), "profiles");
         }
 
         user.updateProfile(
@@ -102,14 +116,63 @@ public class ProfileService {
         user.updateLocation(lat, lng);
     }
 
+    /** Expo 푸시 토큰 등록/갱신 (앱 로그인 시 호출) */
+    @Transactional
+    public void updatePushToken(Long userId, String token) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new PagemateException(ErrorCode.USER_NOT_FOUND));
+        user.updateFcmToken(token);
+    }
+
+    /** 알림(푸시) on/off 설정 변경 */
+    @Transactional
+    public ProfileResponse updatePushEnabled(Long userId, boolean enabled) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new PagemateException(ErrorCode.USER_NOT_FOUND));
+        user.updatePushEnabled(enabled);
+        return buildProfileResponse(user, userId);
+    }
+
+    /**
+     * 계정 삭제(탈퇴). App Store 심사 지침 5.1.1(v) 요구사항.
+     * 거래·채팅·리뷰가 사용자 행을 참조하므로 행을 지우는 대신 개인정보를 모두 제거하고
+     * 진행 중인 대여를 정리한다. 같은 소셜 계정으로 다시 로그인하면 새 계정이 생성된다.
+     */
+    @Transactional
+    public void deleteAccount(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new PagemateException(ErrorCode.USER_NOT_FOUND));
+        if (user.isDeleted()) {
+            throw new PagemateException(ErrorCode.USER_NOT_FOUND);
+        }
+
+        // 상대방이 무기한 대기하지 않도록 진행 중인 대여를 모두 취소한다
+        exchangeRepository.findByUserIdAndStatusIn(userId, ACTIVE_EXCHANGE_STATUSES)
+                .forEach(Exchange::cancel);
+
+        // 등록한 도서는 거래 이력이 참조하므로 행을 남기되,
+        // 대여 목록 조회에서 탈퇴 사용자의 도서를 제외한다 (BookQueryRepository.findBooks)
+
+        notificationRepository.deleteAllByUserId(userId);
+
+        if (user.getProfileImage() != null) {
+            imageStorage.delete(user.getProfileImage());
+        }
+
+        user.softDelete();
+    }
+
     public ProfileResponse getUserProfile(Long targetId) {
         User user = userRepository.findById(targetId)
                 .orElseThrow(() -> new PagemateException(ErrorCode.USER_NOT_FOUND));
+        if (user.isDeleted()) {
+            throw new PagemateException(ErrorCode.USER_NOT_FOUND);
+        }
         return buildProfileResponse(user, targetId);
     }
 
     public BookPageResponse<BookSummaryResponse> getUserBooks(Long targetId, int page, int size) {
-        if (!userRepository.existsById(targetId)) {
+        if (!userRepository.existsByIdAndDeletedAtIsNull(targetId)) {
             throw new PagemateException(ErrorCode.USER_NOT_FOUND);
         }
         return BookPageResponse.of(
