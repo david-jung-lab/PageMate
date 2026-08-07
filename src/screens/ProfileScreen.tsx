@@ -2,7 +2,7 @@ import React, { useState, useCallback } from 'react';
 import {
   View, Text, Image, ScrollView, TouchableOpacity, Modal, TextInput,
   StyleSheet, SafeAreaView, StatusBar, ActivityIndicator, Alert, Platform,
-  KeyboardAvoidingView,
+  KeyboardAvoidingView, Switch,
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { router, useFocusEffect } from 'expo-router';
@@ -195,19 +195,21 @@ interface SettingsRowProps {
   isLast?: boolean;
   onPress?: () => void;
   hideArrow?: boolean;
+  rightElement?: React.ReactNode;
 }
 
-const SettingsRow: React.FC<SettingsRowProps> = ({ title, subtitle, danger, isLast, onPress, hideArrow }) => (
+const SettingsRow: React.FC<SettingsRowProps> = ({ title, subtitle, danger, isLast, onPress, hideArrow, rightElement }) => (
   <TouchableOpacity
     style={[styles.settingsItem, !isLast && styles.settingsItemBorder]}
     onPress={onPress}
-    activeOpacity={0.7}
+    activeOpacity={onPress ? 0.7 : 1}
+    disabled={!onPress && !!rightElement}
   >
     <View style={styles.settingsMeta}>
       <Text style={[styles.settingsTitle, danger && { color: colors.danger }]}>{title}</Text>
       {subtitle ? <Text style={styles.settingsSubtitle}>{subtitle}</Text> : null}
     </View>
-    {!hideArrow && <PMIcon name="chevronRight" size={16} color={colors.textTertiary} />}
+    {rightElement ?? (!hideArrow && <PMIcon name="chevronRight" size={16} color={colors.textTertiary} />)}
   </TouchableOpacity>
 );
 
@@ -332,12 +334,61 @@ const ProfileScreen: React.FC = () => {
   const [completedExchanges, setCompletedExchanges] = useState<Exchange[]>([]);
   const [loading, setLoading] = useState(true);
   const [neighborhoodVisible, setNeighborhoodVisible] = useState(false);
+  const [pushSaving, setPushSaving] = useState(false);
   const clearAuth = useAuthStore((s) => s.clearAuth);
+
+  // 알림(푸시) on/off — 낙관적 업데이트, 실패 시 롤백
+  const handleTogglePush = async (next: boolean) => {
+    if (!profile || pushSaving) return;
+    setPushSaving(true);
+    setProfile({ ...profile, pushEnabled: next });
+    try {
+      await profileApi.updateNotificationSetting(next);
+    } catch {
+      setProfile((p) => (p ? { ...p, pushEnabled: !next } : p));
+      Alert.alert('알림 설정 실패', '잠시 후 다시 시도해주세요.');
+    } finally {
+      setPushSaving(false);
+    }
+  };
 
   const handleLogout = async () => {
     try { await authApi.logout(); } catch { /* 무시 */ }
     await clearAuth();
     router.replace('/(auth)/login');
+  };
+
+  // 되돌릴 수 없는 작업이므로 2단계로 확인받는다
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      '회원 탈퇴',
+      '계정과 프로필 정보가 삭제되고, 진행 중인 대여는 모두 취소됩니다.\n삭제된 계정은 복구할 수 없습니다.',
+      [
+        { text: '취소', style: 'cancel' },
+        {
+          text: '계속',
+          style: 'destructive',
+          onPress: () => Alert.alert(
+            '정말 탈퇴하시겠어요?',
+            '이 작업은 되돌릴 수 없습니다.',
+            [
+              { text: '취소', style: 'cancel' },
+              { text: '탈퇴하기', style: 'destructive', onPress: deleteAccount },
+            ],
+          ),
+        },
+      ],
+    );
+  };
+
+  const deleteAccount = async () => {
+    try {
+      await profileApi.deleteAccount();
+      await clearAuth();
+      router.replace('/(auth)/login');
+    } catch {
+      Alert.alert('탈퇴 실패', '잠시 후 다시 시도해주세요.');
+    }
   };
 
   const load = useCallback(async () => {
@@ -415,13 +466,28 @@ const ProfileScreen: React.FC = () => {
               />
               <SettingsRow
                 title="알림 설정"
+                subtitle={profile?.pushEnabled === false ? '꺼짐' : '교환·채팅 알림 받기'}
+                rightElement={
+                  <Switch
+                    value={profile?.pushEnabled ?? true}
+                    onValueChange={handleTogglePush}
+                    disabled={pushSaving || !profile}
+                    trackColor={{ true: colors.primary, false: colors.border }}
+                  />
+                }
+              />
+              <SettingsRow
+                danger
+                hideArrow
+                title="로그아웃"
+                onPress={handleLogout}
               />
               <SettingsRow
                 danger
                 isLast
                 hideArrow
-                title="로그아웃"
-                onPress={handleLogout}
+                title="회원 탈퇴"
+                onPress={handleDeleteAccount}
               />
             </View>
 

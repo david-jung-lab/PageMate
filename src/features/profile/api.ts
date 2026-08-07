@@ -34,6 +34,14 @@ export const profileApi = {
     return res.data.data;
   },
 
+  /** 알림(푸시) on/off 설정 변경 */
+  updateNotificationSetting: async (pushEnabled: boolean): Promise<Profile> => {
+    const res = await api.patch<ApiResponse<Profile>>('/v1/users/me/notification-setting', {
+      pushEnabled,
+    });
+    return res.data.data;
+  },
+
   getMyBooks: async (page = 0, size = 10): Promise<BookPage> => {
     const res = await api.get<ApiResponse<BookPage>>('/v1/users/me/books', {
       params: { page, size },
@@ -46,5 +54,10 @@ export const profileApi = {
       params: { page, size },
     });
     return res.data.data;
+  },
+
+  // 계정 삭제(탈퇴). 되돌릴 수 없다.
+  deleteAccount: async (): Promise<void> => {
+    await api.delete('/v1/users/me');
   },
 };
