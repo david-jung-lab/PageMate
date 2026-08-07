@@ -6,7 +6,7 @@ import app.pagemate.auth.client.KakaoOAuthClient;
 import app.pagemate.book.Book;
 import app.pagemate.book.BookRepository;
 import app.pagemate.common.security.JwtProvider;
-import app.pagemate.common.service.S3Service;
+import app.pagemate.common.service.ImageStorage;
 import app.pagemate.user.User;
 import app.pagemate.user.UserRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -43,7 +43,7 @@ class ExchangeControllerTest {
 
     @MockitoBean KakaoOAuthClient kakaoOAuthClient;
     @MockitoBean GoogleOAuthClient googleOAuthClient;
-    @MockitoBean S3Service s3Service;
+    @MockitoBean ImageStorage imageStorage;
 
     private String requesterToken;
     private String respondentToken;

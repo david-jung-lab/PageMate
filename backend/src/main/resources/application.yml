@@ -44,12 +44,9 @@ jwt:
   access-expiration: 3600       # 1시간 (초)
   refresh-expiration: 1209600   # 14일 (초)
 
-aws:
-  s3:
-    bucket: ${AWS_S3_BUCKET:pagemate-dev}
-    region: ${AWS_REGION:ap-northeast-2}
-  access-key: ${AWS_ACCESS_KEY:}
-  secret-key: ${AWS_SECRET_KEY:}
+# 이미지 저장소: Cloudinary. CLOUDINARY_URL 미설정 시 업로드 비활성(null 반환)
+cloudinary:
+  url: ${CLOUDINARY_URL:}
 
 kakao:
   api-key: ${KAKAO_REST_API_KEY}
@@ -64,6 +61,13 @@ oauth:
     redirect-uri: ${GOOGLE_REDIRECT_URI}
     android-client-id: ${GOOGLE_ANDROID_CLIENT_ID}
     ios-client-id: ${GOOGLE_IOS_CLIENT_ID}
+
+# App Store 심사관용 체험 로그인. 공개 엔드포인트이므로 심사 기간에만 켜고,
+# 심사 통과 후 DEMO_LOGIN_ENABLED=false 로 즉시 닫는다.
+demo:
+  login:
+    enabled: ${DEMO_LOGIN_ENABLED:false}
+    key: ${DEMO_LOGIN_KEY:}
 
 springdoc:
   swagger-ui:
