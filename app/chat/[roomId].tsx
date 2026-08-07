@@ -1,10 +1,11 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import {
-  View, Text, FlatList, TextInput, TouchableOpacity,
+  View, Text, Image, FlatList, TextInput, TouchableOpacity,
   StyleSheet, SafeAreaView, StatusBar, KeyboardAvoidingView,
-  Platform, ActivityIndicator,
+  Platform, ActivityIndicator, Alert,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import * as ImagePicker from 'expo-image-picker';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { colors, spacing, radius, fontSize } from '@/theme/tokens';
 import PMIcon from '@/components/ui/PMIcon';
@@ -61,9 +62,13 @@ function Bubble({ msg, isMe }: { msg: ChatMessage; isMe: boolean }) {
         {!isMe && <Text style={bubbleStyles.senderName}>{msg.senderNickname}</Text>}
         <View style={bubbleStyles.bubbleRow}>
           {isMe && <Text style={bubbleStyles.time}>{formatTime(msg.createdAt)}</Text>}
-          <View style={[bubbleStyles.bubble, isMe ? bubbleStyles.bubbleMe : bubbleStyles.bubbleThem]}>
-            <Text style={[bubbleStyles.text, isMe && bubbleStyles.textMe]}>{msg.content}</Text>
-          </View>
+          {msg.messageType === 'IMAGE' ? (
+            <Image source={{ uri: msg.content }} style={bubbleStyles.image} resizeMode="cover" />
+          ) : (
+            <View style={[bubbleStyles.bubble, isMe ? bubbleStyles.bubbleMe : bubbleStyles.bubbleThem]}>
+              <Text style={[bubbleStyles.text, isMe && bubbleStyles.textMe]}>{msg.content}</Text>
+            </View>
+          )}
           {!isMe && <Text style={bubbleStyles.time}>{formatTime(msg.createdAt)}</Text>}
         </View>
       </View>
@@ -101,6 +106,11 @@ const bubbleStyles = StyleSheet.create({
   },
   text: { fontSize: fontSize.body, color: colors.text, lineHeight: 20 },
   textMe: { color: '#fff' },
+  image: {
+    width: 200, height: 250,
+    borderRadius: radius.lg,
+    backgroundColor: colors.surface,
+  },
   time: { fontSize: 10, color: colors.textTertiary, marginBottom: 2 },
   systemWrap: {
     alignItems: 'center', marginVertical: 8,
@@ -185,6 +195,32 @@ export default function ChatRoomScreen() {
     sendMessage(text);
   };
 
+  // 이미지 선택 → Cloudinary 업로드 → 서버가 WebSocket으로 브로드캐스트(=구독으로 표시)
+  const [imageUploading, setImageUploading] = useState(false);
+  const handlePickImage = async () => {
+    if (imageUploading) return;
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert('권한 필요', '사진을 보내려면 사진 접근 권한을 허용해 주세요.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'], quality: 0.8,
+    });
+    if (result.canceled) return;
+    const asset = result.assets[0];
+    setImageUploading(true);
+    try {
+      await chatApi.sendImage(Number(roomId), {
+        uri: asset.uri, mimeType: asset.mimeType, fileName: asset.fileName ?? undefined,
+      });
+    } catch {
+      Alert.alert('전송 실패', '사진을 보내지 못했어요. 잠시 후 다시 시도해 주세요.');
+    } finally {
+      setImageUploading(false);
+    }
+  };
+
   const loadMore = () => {
     if (hasNextPage && !isFetchingNextPage) fetchNextPage();
   };
@@ -243,6 +279,16 @@ export default function ChatRoomScreen() {
 
         {/* 입력바 */}
         <View style={styles.inputBar}>
+          <TouchableOpacity
+            style={styles.attachBtn}
+            onPress={handlePickImage}
+            activeOpacity={0.7}
+            disabled={imageUploading}
+          >
+            {imageUploading
+              ? <ActivityIndicator size="small" color={colors.primary} />
+              : <PMIcon name="plus" size={22} color={colors.textSecondary} />}
+          </TouchableOpacity>
           <TextInput
             style={styles.textInput}
             value={input}
@@ -306,6 +352,11 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     paddingHorizontal: 14, paddingVertical: 10,
     fontSize: fontSize.body, color: colors.text,
+  },
+  attachBtn: {
+    width: 40, height: 40, borderRadius: 20,
+    alignItems: 'center', justifyContent: 'center',
+    flexShrink: 0,
   },
   sendBtn: {
     width: 40, height: 40, borderRadius: 20,
