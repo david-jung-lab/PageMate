@@ -58,12 +58,15 @@ class ChatControllerTest {
     }
 
     @AfterAll
-    static void tearDown(@Autowired ChatRoomRepository chatRoomRepository,
+    static void tearDown(@Autowired MessageRepository messageRepository,
+                         @Autowired ChatRoomParticipantRepository participantRepository,
+                         @Autowired ChatRoomRepository chatRoomRepository,
                          @Autowired BookRepository bookRepository,
                          @Autowired UserRepository userRepository) {
-        chatRoomRepository.findAll().stream()
-                .filter(r -> r.getRequester().getId().equals(requesterId))
-                .forEach(chatRoomRepository::delete);
+        // 테스트 스키마(H2)는 ON DELETE CASCADE가 없으므로 자식 행부터 순서대로 삭제
+        messageRepository.deleteAll();
+        participantRepository.deleteAll();
+        chatRoomRepository.deleteAll();
         bookRepository.deleteById(bookId);
         userRepository.deleteById(requesterId);
         userRepository.deleteById(ownerId);
