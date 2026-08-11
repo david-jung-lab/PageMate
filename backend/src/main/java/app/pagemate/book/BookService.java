@@ -50,7 +50,7 @@ public class BookService {
     public BookPageResponse<BookSummaryResponse> getBooks(
             String keyword, String genre, String neighborhood, String sort, int page, int size
     ) {
-        Page<Book> bookPage = bookQueryRepository.findBooks(keyword, genre, neighborhood, PageRequest.of(page, size));
+        Page<Book> bookPage = bookQueryRepository.findBooks(keyword, genre, neighborhood, sort, PageRequest.of(page, size));
         return BookPageResponse.of(bookPage, BookSummaryResponse::of);
     }
 

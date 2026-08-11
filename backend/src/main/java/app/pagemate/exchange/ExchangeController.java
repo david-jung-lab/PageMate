@@ -5,6 +5,7 @@ import app.pagemate.exchange.dto.CompleteRequest;
 import app.pagemate.exchange.dto.ExchangeCreateRequest;
 import app.pagemate.exchange.dto.ExchangeResponse;
 import app.pagemate.exchange.dto.RespondRequest;
+import app.pagemate.exchange.dto.ScheduleRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -49,6 +50,21 @@ public class ExchangeController {
             @AuthenticationPrincipal Long userId,
             @PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.ok(exchangeService.getRequesterBooks(userId, id)));
+    }
+
+    @PostMapping("/{id}/pledge")
+    public ResponseEntity<ApiResponse<ExchangeResponse>> pledge(
+            @AuthenticationPrincipal Long userId,
+            @PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.ok(exchangeService.pledgeExchange(userId, id)));
+    }
+
+    @PatchMapping("/{id}/schedule")
+    public ResponseEntity<ApiResponse<ExchangeResponse>> schedule(
+            @AuthenticationPrincipal Long userId,
+            @PathVariable Long id,
+            @Valid @RequestBody ScheduleRequest req) {
+        return ResponseEntity.ok(ApiResponse.ok(exchangeService.scheduleExchange(userId, id, req)));
     }
 
     @PatchMapping("/{id}/respond")

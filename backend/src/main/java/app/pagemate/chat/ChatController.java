@@ -5,6 +5,7 @@ import app.pagemate.common.response.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -37,11 +38,27 @@ public class ChatController {
         return ApiResponse.ok(chatService.getMessages(userId, roomId, cursor, size));
     }
 
+    @GetMapping("/rooms/{roomId}/exchange")
+    public ApiResponse<ExchangeSummaryResponse> getRoomExchange(
+            @AuthenticationPrincipal Long userId,
+            @PathVariable Long roomId) {
+        return ApiResponse.ok(chatService.getRoomExchange(userId, roomId));
+    }
+
     @PatchMapping("/rooms/{roomId}/read")
     public ApiResponse<Void> markAsRead(
             @AuthenticationPrincipal Long userId,
             @PathVariable Long roomId) {
         chatService.markAsRead(userId, roomId);
         return ApiResponse.ok();
+    }
+
+    /** 이미지 메시지 전송 (multipart). 업로드 후 WebSocket으로 브로드캐스트됨. */
+    @PostMapping(value = "/rooms/{roomId}/images", consumes = "multipart/form-data")
+    public ApiResponse<MessageResponse> sendImage(
+            @AuthenticationPrincipal Long userId,
+            @PathVariable Long roomId,
+            @RequestPart("image") MultipartFile image) {
+        return ApiResponse.ok(chatService.sendImageMessage(userId, roomId, image));
     }
 }

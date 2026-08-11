@@ -20,6 +20,7 @@ import {
   API_BASE_URL,
   GOOGLE_WEB_CLIENT_ID,
   KAKAO_REST_API_KEY,
+  DEMO_LOGIN_KEY,
 } from '@/constants/index';
 
 WebBrowser.maybeCompleteAuthSession();
@@ -93,7 +94,7 @@ const SocialButton = ({ bg, color, logo, label, onPress, loading }: SocialButton
 // ─── Screen ──────────────────────────────────────────────────────────────────
 export default function LoginScreen() {
   const setAuth = useAuthStore((s) => s.setAuth);
-  const [loading, setLoading] = React.useState<'google' | 'kakao' | null>(null);
+  const [loading, setLoading] = React.useState<'google' | 'kakao' | 'demo' | null>(null);
 
   useEffect(() => {
     console.log('[Google OAuth] redirectUri:', googleRedirectUri);
@@ -186,6 +187,22 @@ export default function LoginScreen() {
     }
   };
 
+  // ── 데모(체험) 로그인 ─ Apple 심사관용 ───────────────────────────────────
+  const handleDemo = async () => {
+    setLoading('demo');
+    try {
+      const res = await authApi.loginDemo();
+      const { accessToken, refreshToken, user } = res.data.data;
+      await setAuth(accessToken, refreshToken, user);
+      router.replace('/(tabs)');
+    } catch (e: any) {
+      const msg = e?.response?.data?.error?.message ?? e?.message ?? '알 수 없는 오류';
+      Alert.alert('체험 로그인 실패', msg);
+    } finally {
+      setLoading(null);
+    }
+  };
+
   const handleGoogle = async () => {
     setLoading('google');
     await googlePromptAsync();
@@ -253,6 +270,33 @@ export default function LoginScreen() {
           onPress={handleKakao}
           loading={loading === 'kakao'}
         />
+
+        {/* 체험(데모) 로그인 — 심사 기간에만 키가 주입되어 노출된다 */}
+        {!!DEMO_LOGIN_KEY && (
+          <>
+            <View style={styles.dividerRow}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.dividerText}>또는</Text>
+              <View style={styles.dividerLine} />
+            </View>
+
+            <Pressable
+              onPress={handleDemo}
+              disabled={!!loading}
+              style={({ pressed }) => [
+                styles.demoBtn,
+                pressed && styles.socialBtnPressed,
+                loading === 'demo' && { opacity: 0.7 },
+              ]}
+            >
+              {loading === 'demo' ? (
+                <ActivityIndicator size="small" color={WHITE} />
+              ) : (
+                <Text style={styles.demoBtnText}>둘러보기 (체험 계정으로 시작)</Text>
+              )}
+            </Pressable>
+          </>
+        )}
       </View>
 
       {/* Footer */}
@@ -351,6 +395,37 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     letterSpacing: -0.15,
+  },
+  dividerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginVertical: 2,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: 'rgba(250,250,248,0.15)',
+  },
+  dividerText: {
+    fontSize: 12,
+    color: 'rgba(250,250,248,0.4)',
+  },
+  demoBtn: {
+    height: 54,
+    paddingHorizontal: 16,
+    borderRadius: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(250,250,248,0.25)',
+  },
+  demoBtnText: {
+    fontSize: 15,
+    fontWeight: '600',
+    letterSpacing: -0.15,
+    color: WHITE,
   },
   footer: {
     paddingHorizontal: 32,

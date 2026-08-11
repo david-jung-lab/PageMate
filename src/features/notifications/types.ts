@@ -3,7 +3,10 @@ export type NotificationType =
   | 'EXCHANGE_ACCEPTED'
   | 'EXCHANGE_REJECTED'
   | 'EXCHANGE_COMPLETED'
-  | 'CHAT_MESSAGE';
+  | 'CHAT_MESSAGE'
+  | 'PLEDGE_REQUESTED'
+  | 'SECOND_DUE'
+  | 'REVIEW_REQUESTED';
 
 export interface NotificationItem {
   id: number;

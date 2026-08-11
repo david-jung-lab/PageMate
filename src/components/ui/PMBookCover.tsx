@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, Image, StyleSheet } from 'react-native';
+import { View, Text, Image, StyleSheet, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { bookCoverPalettes } from '../../theme/tokens';
 
@@ -60,11 +60,10 @@ const styles = StyleSheet.create({
     padding: 12,
     paddingHorizontal: 10,
     justifyContent: 'space-between',
-    shadowColor: '#1A1A2E',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 6,
+    ...Platform.select({
+      ios: { shadowColor: '#1A1A2E', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 12 },
+      android: { elevation: 6 },
+    }),
   },
   spine: {
     position: 'absolute',

@@ -41,11 +41,28 @@ export const exchangeApi = {
     return res.data.data;
   },
 
+  // WF7: 약속문 동의
+  pledgeExchange: async (id: number): Promise<Exchange> => {
+    const res = await api.post<ApiResponse<Exchange>>(`/exchanges/${id}/pledge`);
+    return res.data.data;
+  },
+
+  // WF8: 일정 확정
+  scheduleExchange: async (id: number, exchangeDate: string, place: string): Promise<Exchange> => {
+    const res = await api.patch<ApiResponse<Exchange>>(`/exchanges/${id}/schedule`, {
+      exchangeDate,
+      place,
+    });
+    return res.data.data;
+  },
+
+  // WF9: 1차 교환 완료
   completeExchange: async (id: number, durationDays: number): Promise<Exchange> => {
     const res = await api.patch<ApiResponse<Exchange>>(`/exchanges/${id}/complete`, { durationDays });
     return res.data.data;
   },
 
+  // WF11: 2차 교환 완료
   completeSecondExchange: async (id: number): Promise<Exchange> => {
     const res = await api.patch<ApiResponse<Exchange>>(`/exchanges/${id}/complete-second`);
     return res.data.data;

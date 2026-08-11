@@ -12,6 +12,7 @@ public enum ErrorCode {
     UNAUTHORIZED("인증 토큰이 없거나 만료되었습니다.", HttpStatus.UNAUTHORIZED),
     FORBIDDEN("접근 권한이 없습니다.", HttpStatus.FORBIDDEN),
     INVALID_TOKEN("유효하지 않은 토큰입니다.", HttpStatus.UNAUTHORIZED),
+    DEMO_LOGIN_DISABLED("사용할 수 없는 로그인 방식입니다.", HttpStatus.FORBIDDEN),
 
     // User
     USER_NOT_FOUND("사용자를 찾을 수 없습니다.", HttpStatus.NOT_FOUND),
@@ -32,6 +33,7 @@ public enum ErrorCode {
     // Chat
     CHAT_ROOM_NOT_FOUND("채팅방을 찾을 수 없습니다.", HttpStatus.NOT_FOUND),
     CHAT_ACCESS_DENIED("채팅방 참여자만 접근할 수 있습니다.", HttpStatus.FORBIDDEN),
+    IMAGE_UPLOAD_FAILED("이미지 업로드에 실패했습니다.", HttpStatus.INTERNAL_SERVER_ERROR),
 
     // Notification
     NOTIFICATION_NOT_FOUND("알림을 찾을 수 없습니다.", HttpStatus.NOT_FOUND),

@@ -62,6 +62,25 @@ public class ProfileController {
         return ApiResponse.ok(profileService.updateMyProfile(userId, req));
     }
 
+    /** Expo 푸시 토큰 등록/갱신 */
+    @PostMapping("/me/push-token")
+    public ApiResponse<Void> registerPushToken(
+            @AuthenticationPrincipal Long userId,
+            @jakarta.validation.Valid @RequestBody app.pagemate.user.dto.PushTokenRequest req
+    ) {
+        profileService.updatePushToken(userId, req.getToken());
+        return ApiResponse.ok(null);
+    }
+
+    /** 알림(푸시) on/off 설정 변경 */
+    @PatchMapping("/me/notification-setting")
+    public ApiResponse<ProfileResponse> updateNotificationSetting(
+            @AuthenticationPrincipal Long userId,
+            @jakarta.validation.Valid @RequestBody app.pagemate.user.dto.PushSettingRequest req
+    ) {
+        return ApiResponse.ok(profileService.updatePushEnabled(userId, req.getPushEnabled()));
+    }
+
     @PatchMapping("/me/location")
     public ApiResponse<Void> updateLocation(
             @AuthenticationPrincipal Long userId,
@@ -79,6 +98,13 @@ public class ProfileController {
             @RequestParam(defaultValue = "20") int size
     ) {
         return ApiResponse.ok(profileService.getUserBooks(userId, page, size));
+    }
+
+    /** 계정 삭제(탈퇴) - App Store 심사 지침 5.1.1(v) */
+    @DeleteMapping("/me")
+    public ApiResponse<Void> deleteAccount(@AuthenticationPrincipal Long userId) {
+        profileService.deleteAccount(userId);
+        return ApiResponse.ok(null);
     }
 
     @GetMapping("/{id}")

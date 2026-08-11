@@ -2,6 +2,7 @@ plugins {
     id 'java'
     id 'org.springframework.boot' version '3.4.5'
     id 'io.spring.dependency-management' version '1.1.7'
+    id 'jacoco'
 }
 
 group = 'app.pagemate'
@@ -46,11 +47,10 @@ dependencies {
     // OAuth2
     implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'
 
-    // AWS S3
-    implementation 'software.amazon.awssdk:s3:2.29.52'
+    // 이미지 저장소: Cloudinary (업로드 시 CDN URL 반환)
+    implementation 'com.cloudinary:cloudinary-http44:1.39.0'
 
-    // FCM
-    implementation 'com.google.firebase:firebase-admin:9.4.2'
+    // 푸시 알림: Expo Push(exp.host)로 발송 — firebase-admin 불필요 (RestClient 사용)
 
     // Lombok
     compileOnly 'org.projectlombok:lombok'
@@ -74,4 +74,17 @@ dependencies {
 
 tasks.named('test') {
     useJUnitPlatform()
+    finalizedBy jacocoTestReport
+}
+
+jacoco {
+    toolVersion = '0.8.12'
+}
+
+jacocoTestReport {
+    dependsOn test
+    reports {
+        xml.required = true
+        html.required = true
+    }
 }

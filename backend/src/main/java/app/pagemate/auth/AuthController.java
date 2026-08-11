@@ -40,6 +40,14 @@ public class AuthController {
         return ApiResponse.ok(authService.loginWithGoogle(request.getAuthorizationCode(), request.getRedirectUri()));
     }
 
+    /** Apple App Store 심사관용 데모 로그인 (시드된 체험 계정으로 즉시 로그인) */
+    @PostMapping("/demo")
+    public ApiResponse<AuthResponse> demoLogin(
+            @RequestHeader(value = "X-Demo-Key", required = false) String demoKey
+    ) {
+        return ApiResponse.ok(authService.loginAsDemo(demoKey));
+    }
+
     @PostMapping("/refresh")
     public ApiResponse<AuthResponse.Refresh> refresh(@Valid @RequestBody RefreshRequest request) {
         return ApiResponse.ok(authService.refresh(request.getRefreshToken()));

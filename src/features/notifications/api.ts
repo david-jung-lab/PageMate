@@ -17,4 +17,8 @@ export const notificationApi = {
   /** 전체 읽음 처리 */
   markAllAsRead: () =>
     api.patch('/notifications/read-all'),
+
+  /** Expo 푸시 토큰 등록/갱신 */
+  registerPushToken: (token: string) =>
+    api.post('/v1/users/me/push-token', { token }),
 };

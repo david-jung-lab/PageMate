@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {
-  View, Text, TouchableOpacity, Image, StyleSheet, LayoutChangeEvent,
+  View, Text, TouchableOpacity, Image, StyleSheet, LayoutChangeEvent, Platform,
 } from 'react-native';
 import Svg, { Path, Circle } from 'react-native-svg';
 import { BookSummary, CoverColor } from '../../features/books/types';
@@ -47,7 +47,6 @@ const PMBookCard: React.FC<PMBookCardProps> = ({ book, onPress }) => {
     if (w > 0 && w !== cardW) setCardW(w);
   };
 
-  // 홈 NearBookCard 비율 그대로 (card 155 → book 104×155, imageArea 200)
   const bookW      = cardW > 0 ? Math.round(cardW * 0.67) : 0;
   const bookH      = cardW > 0 ? Math.round(cardW * 1.00) : 0;
   const imageAreaH = cardW > 0 ? Math.round(cardW * 1.29) : 0;
@@ -61,12 +60,9 @@ const PMBookCard: React.FC<PMBookCardProps> = ({ book, onPress }) => {
       onPress={onPress}
       activeOpacity={0.85}
     >
-      {/* 회색 표지 배경 영역 */}
       <View style={[styles.imageArea, imageAreaH > 0 && { height: imageAreaH }]}>
         {bookW > 0 && (
-          // 그림자용 outer (overflow 없음)
           <View style={[styles.bookShadow, { width: bookW, height: bookH }]}>
-            {/* 클리핑용 inner */}
             <View style={[styles.bookInner, { width: bookW, height: bookH }]}>
               {book.imageUrl ? (
                 <Image source={{ uri: book.imageUrl }} style={styles.bookImage} resizeMode="cover" />
@@ -81,7 +77,6 @@ const PMBookCard: React.FC<PMBookCardProps> = ({ book, onPress }) => {
         )}
       </View>
 
-      {/* 텍스트 영역 */}
       <View style={styles.meta}>
         <Text style={styles.title} numberOfLines={1}>{book.title}</Text>
         <Text style={styles.author} numberOfLines={1}>{book.author}</Text>
@@ -105,12 +100,11 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1,
     borderColor: C.line,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 6,
-    elevation: 2,
     overflow: 'hidden',
+    ...Platform.select({
+      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 6 },
+      android: { elevation: 2 },
+    }),
   },
 
   imageArea: {
@@ -124,11 +118,10 @@ const styles = StyleSheet.create({
 
   bookShadow: {
     borderRadius: 8,
-    shadowColor: '#1A1D24',
-    shadowOffset: { width: 2, height: 8 },
-    shadowOpacity: 0.22,
-    shadowRadius: 12,
-    elevation: 10,
+    ...Platform.select({
+      ios: { shadowColor: '#1A1D24', shadowOffset: { width: 2, height: 8 }, shadowOpacity: 0.22, shadowRadius: 12 },
+      android: { elevation: 10 },
+    }),
   },
 
   bookInner: {

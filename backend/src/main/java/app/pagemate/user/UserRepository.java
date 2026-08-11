@@ -8,4 +8,5 @@ import java.util.Optional;
 public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findByOauthProviderAndOauthId(OAuthProvider oauthProvider, String oauthId);
     boolean existsByHandle(String handle);
+    boolean existsByIdAndDeletedAtIsNull(Long id);
 }

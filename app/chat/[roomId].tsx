@@ -1,21 +1,42 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
-  View, Text, FlatList, TextInput, TouchableOpacity,
+  View, Text, Image, FlatList, TextInput, TouchableOpacity,
   StyleSheet, SafeAreaView, StatusBar, KeyboardAvoidingView,
-  Platform, ActivityIndicator,
+  Platform, ActivityIndicator, Alert,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import * as ImagePicker from 'expo-image-picker';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { colors, spacing, radius, fontSize } from '@/theme/tokens';
 import PMIcon from '@/components/ui/PMIcon';
 import { chatApi } from '@/features/chat/api';
-import { ChatMessage } from '@/features/chat/types';
+import { ChatMessage, ExchangeSummary } from '@/features/chat/types';
 import { useAuthStore } from '@/store/index';
 import { useStompChat } from '@/hooks/useStompChat';
 
 function formatTime(iso: string) {
   const d = new Date(iso);
   return d.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false });
+}
+
+function dDayLabel(dateStr: string): string {
+  const days = Math.ceil((new Date(dateStr).getTime() - Date.now()) / 86400000);
+  return days > 0 ? `D-${days}` : days === 0 ? 'D-day' : '기한 초과';
+}
+
+// 진행 단계에 맞는 상단 배너 문구. 표시할 일정이 없으면 null.
+function buildExchangeBanner(e: ExchangeSummary | null | undefined): string | null {
+  if (!e) return null;
+  const place = e.firstExchangePlace ? ` · ${e.firstExchangePlace}` : '';
+  // 1차 교환 완료 후: 반납(2차 교환) 기한 우선 표시
+  if (e.secondExchangeDueDate) {
+    return `📅 2차 교환(반납) ${dDayLabel(e.secondExchangeDueDate)}${place}`;
+  }
+  // 일정 확정 후 1차 교환 전
+  if (e.firstExchangeDate) {
+    return `📅 1차 교환 ${dDayLabel(e.firstExchangeDate)}${place}`;
+  }
+  return null;
 }
 
 function SystemBubble({ content }: { content: string }) {
@@ -41,9 +62,13 @@ function Bubble({ msg, isMe }: { msg: ChatMessage; isMe: boolean }) {
         {!isMe && <Text style={bubbleStyles.senderName}>{msg.senderNickname}</Text>}
         <View style={bubbleStyles.bubbleRow}>
           {isMe && <Text style={bubbleStyles.time}>{formatTime(msg.createdAt)}</Text>}
-          <View style={[bubbleStyles.bubble, isMe ? bubbleStyles.bubbleMe : bubbleStyles.bubbleThem]}>
-            <Text style={[bubbleStyles.text, isMe && bubbleStyles.textMe]}>{msg.content}</Text>
-          </View>
+          {msg.messageType === 'IMAGE' ? (
+            <Image source={{ uri: msg.content }} style={bubbleStyles.image} resizeMode="cover" />
+          ) : (
+            <View style={[bubbleStyles.bubble, isMe ? bubbleStyles.bubbleMe : bubbleStyles.bubbleThem]}>
+              <Text style={[bubbleStyles.text, isMe && bubbleStyles.textMe]}>{msg.content}</Text>
+            </View>
+          )}
           {!isMe && <Text style={bubbleStyles.time}>{formatTime(msg.createdAt)}</Text>}
         </View>
       </View>
@@ -81,6 +106,11 @@ const bubbleStyles = StyleSheet.create({
   },
   text: { fontSize: fontSize.body, color: colors.text, lineHeight: 20 },
   textMe: { color: '#fff' },
+  image: {
+    width: 200, height: 250,
+    borderRadius: radius.lg,
+    backgroundColor: colors.surface,
+  },
   time: { fontSize: 10, color: colors.textTertiary, marginBottom: 2 },
   systemWrap: {
     alignItems: 'center', marginVertical: 8,
@@ -101,7 +131,6 @@ export default function ChatRoomScreen() {
   const accessToken = useAuthStore(s => s.accessToken);
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const listRef = useRef<FlatList>(null);
   const myUserId = useAuthStore(s => s.accessToken)
     ? Number(JSON.parse(atob(accessToken!.split('.')[1])).sub)
     : null;
@@ -124,6 +153,14 @@ export default function ChatRoomScreen() {
     setMessages(flat);
   }, [data]);
 
+  // 상단 고정 배너용 교환 정보
+  const { data: exchangeSummary } = useQuery({
+    queryKey: ['chat-exchange', roomId],
+    queryFn: () => chatApi.getRoomExchange(Number(roomId)),
+    staleTime: 60 * 1000,
+  });
+  const banner = buildExchangeBanner(exchangeSummary);
+
   // 읽음 처리
   useEffect(() => {
     chatApi.markAsRead(Number(roomId)).catch(() => {});
@@ -138,7 +175,7 @@ export default function ChatRoomScreen() {
     }
   }, [myUserId, roomId]);
 
-  const { sendMessage } = useStompChat({
+  const { sendMessage, isConnected } = useStompChat({
     roomId: Number(roomId),
     token: accessToken,
     onMessage: handleNewMessage,
@@ -156,6 +193,32 @@ export default function ChatRoomScreen() {
     if (!text) return;
     setInput('');
     sendMessage(text);
+  };
+
+  // 이미지 선택 → Cloudinary 업로드 → 서버가 WebSocket으로 브로드캐스트(=구독으로 표시)
+  const [imageUploading, setImageUploading] = useState(false);
+  const handlePickImage = async () => {
+    if (imageUploading) return;
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert('권한 필요', '사진을 보내려면 사진 접근 권한을 허용해 주세요.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'], quality: 0.8,
+    });
+    if (result.canceled) return;
+    const asset = result.assets[0];
+    setImageUploading(true);
+    try {
+      await chatApi.sendImage(Number(roomId), {
+        uri: asset.uri, mimeType: asset.mimeType, fileName: asset.fileName ?? undefined,
+      });
+    } catch {
+      Alert.alert('전송 실패', '사진을 보내지 못했어요. 잠시 후 다시 시도해 주세요.');
+    } finally {
+      setImageUploading(false);
+    }
   };
 
   const loadMore = () => {
@@ -183,38 +246,54 @@ export default function ChatRoomScreen() {
         <View style={{ width: 36 }} />
       </View>
 
+      {/* 교환 일정 고정 배너 */}
+      {banner && (
+        <View style={styles.exchangeBanner}>
+          <Text style={styles.exchangeBannerText} numberOfLines={1}>{banner}</Text>
+        </View>
+      )}
+
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={0}
       >
-        {/* 메시지 목록 */}
+        {/* 메시지 목록 — inverted: 최신 메시지가 항상 하단에 고정 */}
         <FlatList
-          ref={listRef}
-          data={messages}
+          data={[...messages].reverse()}
+          inverted
           keyExtractor={m => String(m.id)}
           renderItem={({ item }) => (
             <Bubble msg={item} isMe={item.senderId === myUserId} />
           )}
           contentContainerStyle={styles.listContent}
-          onStartReached={loadMore}
-          onStartReachedThreshold={0.2}
-          ListHeaderComponent={
+          onEndReached={loadMore}
+          onEndReachedThreshold={0.2}
+          ListFooterComponent={
             isFetchingNextPage ? (
               <ActivityIndicator size="small" color={colors.primary} style={{ marginVertical: 8 }} />
             ) : null
           }
-          onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: false })}
           showsVerticalScrollIndicator={false}
         />
 
         {/* 입력바 */}
         <View style={styles.inputBar}>
+          <TouchableOpacity
+            style={styles.attachBtn}
+            onPress={handlePickImage}
+            activeOpacity={0.7}
+            disabled={imageUploading}
+          >
+            {imageUploading
+              ? <ActivityIndicator size="small" color={colors.primary} />
+              : <PMIcon name="plus" size={22} color={colors.textSecondary} />}
+          </TouchableOpacity>
           <TextInput
             style={styles.textInput}
             value={input}
             onChangeText={setInput}
-            placeholder="메시지를 입력하세요"
+            placeholder={isConnected ? '메시지를 입력하세요' : '연결 중...'}
             placeholderTextColor={colors.textTertiary}
             multiline
             maxLength={500}
@@ -223,10 +302,10 @@ export default function ChatRoomScreen() {
             blurOnSubmit={false}
           />
           <TouchableOpacity
-            style={[styles.sendBtn, !input.trim() && styles.sendBtnDisabled]}
+            style={[styles.sendBtn, (!input.trim() || !isConnected) && styles.sendBtnDisabled]}
             onPress={handleSend}
             activeOpacity={0.8}
-            disabled={!input.trim()}
+            disabled={!input.trim() || !isConnected}
           >
             <PMIcon name="send" size={18} color="#fff" />
           </TouchableOpacity>
@@ -249,6 +328,15 @@ const styles = StyleSheet.create({
   },
   headerTitle: { fontSize: 15, fontWeight: '700', color: colors.text },
 
+  exchangeBanner: {
+    backgroundColor: colors.primarySoft,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    paddingHorizontal: spacing.s4,
+    paddingVertical: 10,
+  },
+  exchangeBannerText: { fontSize: 13, fontWeight: '600', color: colors.primary, letterSpacing: -0.2 },
+
   listContent: { paddingHorizontal: spacing.s4, paddingVertical: 12, gap: 2 },
 
   inputBar: {
@@ -264,6 +352,11 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     paddingHorizontal: 14, paddingVertical: 10,
     fontSize: fontSize.body, color: colors.text,
+  },
+  attachBtn: {
+    width: 40, height: 40, borderRadius: 20,
+    alignItems: 'center', justifyContent: 'center',
+    flexShrink: 0,
   },
   sendBtn: {
     width: 40, height: 40, borderRadius: 20,

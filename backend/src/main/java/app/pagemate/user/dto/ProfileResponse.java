@@ -18,6 +18,7 @@ public record ProfileResponse(
         int exchangeCount,
         double averageRating,
         int reviewCount,
+        boolean pushEnabled,
         LocalDateTime createdAt
 ) {
     public static ProfileResponse of(User user, int bookCount, int exchangeCount, double averageRating, int reviewCount) {
@@ -34,6 +35,7 @@ public record ProfileResponse(
                 exchangeCount,
                 averageRating,
                 reviewCount,
+                user.isPushEnabled(),
                 user.getCreatedAt()
         );
     }

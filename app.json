@@ -6,6 +6,11 @@
     "scheme": "pagemate",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
+    "icon": "./assets/images/icon.png",
+    "splash": {
+      "backgroundColor": "#1A1D24",
+      "resizeMode": "contain"
+    },
     "platforms": [
       "ios",
       "android",
@@ -14,15 +19,28 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "app.pagemate",
+      "buildNumber": "7",
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "현재 위치로 활동 동네를 설정하기 위해 위치 권한이 필요합니다."
+        "NSLocationWhenInUseUsageDescription": "현재 위치로 활동 동네를 설정하기 위해 위치 권한이 필요합니다.",
+        "NSPhotoLibraryUsageDescription": "독서 기록 카드에 사용할 책 표지 사진을 선택하기 위해 사진 접근 권한이 필요합니다.",
+        "NSPhotoLibraryAddUsageDescription": "만든 독서 기록 카드를 사진 앨범에 저장하기 위해 권한이 필요합니다.",
+        "NSCameraUsageDescription": "책 표지를 직접 촬영하기 위해 카메라 권한이 필요합니다.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
       "package": "app.pagemate",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/icon.png",
+        "backgroundColor": "#1A1D24"
+      },
       "permissions": [
-        "ACCESS_FINE_LOCATION",
-        "ACCESS_COARSE_LOCATION"
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE"
       ],
       "intentFilters": [
         {
@@ -53,10 +71,40 @@
           "locationWhenInUsePermission": "현재 위치로 활동 동네를 설정하기 위해 위치 권한이 필요합니다."
         }
       ],
-      "expo-font"
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "독서 기록 카드에 사용할 책 표지 사진을 선택하기 위해 사진 접근 권한이 필요합니다.",
+          "cameraPermission": "책 표지를 직접 촬영하기 위해 카메라 권한이 필요합니다."
+        }
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "독서 기록 카드를 사진 앨범에서 불러오기 위해 권한이 필요합니다.",
+          "savePhotosPermission": "만든 독서 기록 카드를 사진 앨범에 저장하기 위해 권한이 필요합니다.",
+          "isAccessMediaLocationEnabled": false
+        }
+      ],
+      "expo-font",
+      [
+        "expo-notifications",
+        {
+          "color": "#4A6CF7"
+        }
+      ],
+      "./plugins/withFmtConstevalFix"
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "30bd8628-c76b-4803-ae3c-2a0c6f423dd0"
+      }
     }
   }
 }

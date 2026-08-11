@@ -4,7 +4,7 @@ import app.pagemate.auth.OAuthProvider;
 import app.pagemate.auth.client.GoogleOAuthClient;
 import app.pagemate.auth.client.KakaoOAuthClient;
 import app.pagemate.common.security.JwtProvider;
-import app.pagemate.common.service.S3Service;
+import app.pagemate.common.service.ImageStorage;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -42,14 +42,14 @@ class ProfileControllerTest {
 
     @MockitoBean KakaoOAuthClient kakaoOAuthClient;
     @MockitoBean GoogleOAuthClient googleOAuthClient;
-    @MockitoBean S3Service s3Service;
+    @MockitoBean ImageStorage imageStorage;
 
     private String accessToken;
     private Long userId;
 
     @BeforeEach
     void setUp() {
-        when(s3Service.upload(any(), anyString())).thenReturn("https://s3.example.com/profiles/test.jpg");
+        when(imageStorage.upload(any(), anyString())).thenReturn("https://s3.example.com/profiles/test.jpg");
 
         // 매 테스트마다 새 유저 저장 (@Transactional 롤백으로 격리됨)
         User user = userRepository.save(User.builder()

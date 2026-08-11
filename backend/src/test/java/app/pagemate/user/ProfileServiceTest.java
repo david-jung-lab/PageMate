@@ -3,10 +3,13 @@ package app.pagemate.user;
 import app.pagemate.auth.OAuthProvider;
 import app.pagemate.book.BookQueryRepository;
 import app.pagemate.book.BookRepository;
-import app.pagemate.book.BookStatus;
 import app.pagemate.common.exception.ErrorCode;
 import app.pagemate.common.exception.PagemateException;
-import app.pagemate.common.service.S3Service;
+import app.pagemate.common.service.ImageStorage;
+import app.pagemate.exchange.Exchange;
+import app.pagemate.exchange.ExchangeRepository;
+import app.pagemate.notification.NotificationRepository;
+import app.pagemate.review.ReviewRepository;
 import app.pagemate.user.dto.ProfileResponse;
 import app.pagemate.user.dto.ProfileUpdateRequest;
 import org.junit.jupiter.api.BeforeEach;
@@ -39,7 +42,10 @@ class ProfileServiceTest {
     @Mock UserRepository userRepository;
     @Mock BookRepository bookRepository;
     @Mock BookQueryRepository bookQueryRepository;
-    @Mock S3Service s3Service;
+    @Mock ImageStorage imageStorage;
+    @Mock ReviewRepository reviewRepository;
+    @Mock ExchangeRepository exchangeRepository;
+    @Mock NotificationRepository notificationRepository;
 
     @InjectMocks ProfileService profileService;
 
@@ -102,7 +108,7 @@ class ProfileServiceTest {
             ReflectionTestUtils.setField(user, "profileImage", "https://s3.example.com/old.jpg");
             given(userRepository.findById(1L)).willReturn(Optional.of(user));
             given(bookRepository.countByOwnerId(1L)).willReturn(0);
-            given(s3Service.upload(any(), eq("profiles")))
+            given(imageStorage.upload(any(), eq("profiles")))
                     .willReturn("https://s3.example.com/new.jpg");
 
             ProfileUpdateRequest req = new ProfileUpdateRequest();
@@ -116,8 +122,8 @@ class ProfileServiceTest {
 
             ProfileResponse res = profileService.updateMyProfile(1L, req);
 
-            verify(s3Service).delete("https://s3.example.com/old.jpg");
-            verify(s3Service).upload(any(), eq("profiles"));
+            verify(imageStorage).delete("https://s3.example.com/old.jpg");
+            verify(imageStorage).upload(any(), eq("profiles"));
             assertThat(res.nickname()).isEqualTo("새닉네임");
             assertThat(res.bio()).isEqualTo("새 소개");
             assertThat(res.location()).isEqualTo("연남동");
@@ -137,7 +143,7 @@ class ProfileServiceTest {
 
             ProfileResponse res = profileService.updateMyProfile(1L, req);
 
-            verifyNoInteractions(s3Service);
+            verifyNoInteractions(imageStorage);
             assertThat(res.nickname()).isEqualTo("수정닉네임");
             assertThat(res.bio()).isEqualTo("수정 소개");
         }
@@ -164,7 +170,7 @@ class ProfileServiceTest {
         void uploadImageWhenNoPreviousImage() {
             given(userRepository.findById(1L)).willReturn(Optional.of(user));
             given(bookRepository.countByOwnerId(1L)).willReturn(0);
-            given(s3Service.upload(any(), eq("profiles")))
+            given(imageStorage.upload(any(), eq("profiles")))
                     .willReturn("https://s3.example.com/first.jpg");
 
             ProfileUpdateRequest req = new ProfileUpdateRequest();
@@ -174,8 +180,8 @@ class ProfileServiceTest {
             profileService.updateMyProfile(1L, req);
 
             // 기존 이미지 없으므로 delete 호출 없음
-            verify(s3Service, never()).delete(any());
-            verify(s3Service).upload(any(), eq("profiles"));
+            verify(imageStorage, never()).delete(any());
+            verify(imageStorage).upload(any(), eq("profiles"));
         }
 
         @Test
@@ -229,8 +235,9 @@ class ProfileServiceTest {
         @Test
         @DisplayName("성공 - 등록 도서 목록 반환 (빈 페이지)")
         void success() {
-            given(userRepository.existsById(1L)).willReturn(true);
-            given(bookQueryRepository.findMyBooks(eq(1L), eq(BookStatus.AVAILABLE), any()))
+            given(userRepository.existsByIdAndDeletedAtIsNull(1L)).willReturn(true);
+            // 본인/타인 프로필의 도서 목록은 상태 필터 없이(status = null) 전체를 조회한다
+            given(bookQueryRepository.findMyBooks(eq(1L), isNull(), any()))
                     .willReturn(new PageImpl<>(Collections.emptyList(), PageRequest.of(0, 20), 0));
 
             var result = profileService.getUserBooks(1L, 0, 20);
@@ -242,12 +249,58 @@ class ProfileServiceTest {
         @Test
         @DisplayName("실패 - 존재하지 않는 유저 → USER_NOT_FOUND")
         void userNotFound() {
-            given(userRepository.existsById(99L)).willReturn(false);
+            given(userRepository.existsByIdAndDeletedAtIsNull(99L)).willReturn(false);
 
             assertThatThrownBy(() -> profileService.getUserBooks(99L, 0, 20))
                     .isInstanceOf(PagemateException.class)
                     .extracting(e -> ((PagemateException) e).getErrorCode())
                     .isEqualTo(ErrorCode.USER_NOT_FOUND);
+        }
+    }
+
+    @Nested
+    @DisplayName("deleteAccount")
+    class DeleteAccount {
+
+        @Test
+        @DisplayName("성공 - 개인정보를 익명화하고 진행 중 대여를 취소한다")
+        void success() {
+            ReflectionTestUtils.setField(user, "profileImage", "https://s3/profiles/a.png");
+            ReflectionTestUtils.setField(user, "email", "reader@example.com");
+            ReflectionTestUtils.setField(user, "refreshToken", "stored-refresh-token");
+            Exchange ongoing = mock(Exchange.class);
+
+            given(userRepository.findById(1L)).willReturn(Optional.of(user));
+            given(exchangeRepository.findByUserIdAndStatusIn(eq(1L), anyList()))
+                    .willReturn(List.of(ongoing));
+
+            profileService.deleteAccount(1L);
+
+            verify(ongoing).cancel();
+            verify(notificationRepository).deleteAllByUserId(1L);
+            verify(imageStorage).delete("https://s3/profiles/a.png");
+
+            assertThat(user.isDeleted()).isTrue();
+            assertThat(user.getOauthId()).isEqualTo("deleted:1");
+            assertThat(user.getEmail()).isNull();
+            assertThat(user.getNickname()).isEqualTo("탈퇴한 사용자");
+            assertThat(user.getProfileImage()).isNull();
+            assertThat(user.getLocation()).isNull();
+            assertThat(user.getRefreshToken()).isNull();
+        }
+
+        @Test
+        @DisplayName("실패 - 이미 탈퇴한 계정 → USER_NOT_FOUND")
+        void alreadyDeleted() {
+            user.softDelete();
+            given(userRepository.findById(1L)).willReturn(Optional.of(user));
+
+            assertThatThrownBy(() -> profileService.deleteAccount(1L))
+                    .isInstanceOf(PagemateException.class)
+                    .extracting(e -> ((PagemateException) e).getErrorCode())
+                    .isEqualTo(ErrorCode.USER_NOT_FOUND);
+
+            verify(notificationRepository, never()).deleteAllByUserId(anyLong());
         }
     }
 }

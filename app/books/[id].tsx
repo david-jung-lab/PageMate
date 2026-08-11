@@ -2,7 +2,7 @@ import React from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
   Image, StyleSheet, SafeAreaView, StatusBar, ActivityIndicator,
-  Alert,
+  Alert, Platform,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -14,6 +14,7 @@ import PMAvatar from '../../src/components/ui/PMAvatar';
 import { booksApi } from '../../src/features/books/api';
 import { exchangeApi } from '../../src/features/exchange/api';
 import { STATUS_LABELS, GENRE_LABELS } from '../../src/constants';
+import { useAuthStore } from '../../src/store';
 import Svg, { Path } from 'react-native-svg';
 
 const statusVariant = (s: string) => {
@@ -26,6 +27,7 @@ export default function BookDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const queryClient = useQueryClient();
+  const myUserId = useAuthStore(s => s.user?.id);
 
   const { data: book, isLoading } = useQuery({
     queryKey: ['book', id],
@@ -37,23 +39,41 @@ export default function BookDetailScreen() {
     mutationFn: () => exchangeApi.createExchange(Number(id)),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['exchanges'] });
-      Alert.alert('교환 요청 완료', '상대방의 수락을 기다려 주세요.');
+      if (Platform.OS === 'web') {
+        window.alert('교환 요청이 완료됐어요! 상대방의 수락을 기다려 주세요.');
+        router.push('/(tabs)/swap' as any);
+      } else {
+        Alert.alert('교환 요청 완료', '상대방의 수락을 기다려 주세요.', [
+          { text: '확인', onPress: () => router.push('/(tabs)/swap' as any) },
+        ]);
+      }
     },
     onError: (err: any) => {
       const code = err?.response?.data?.error?.code;
       const msg =
-        code === 'DUPLICATE_REQUEST' ? '이미 요청한 도서예요.' :
+        code === 'DUPLICATE_REQUEST' ? '이미 교환 요청한 도서예요.' :
         code === 'BOOK_NOT_AVAILABLE' ? '교환할 수 없는 상태의 책이에요.' :
+        code === 'SELF_EXCHANGE' ? '내 책에는 교환 요청할 수 없어요.' :
         '교환 요청에 실패했어요.';
-      Alert.alert('오류', msg);
+      if (Platform.OS === 'web') {
+        window.alert(msg);
+      } else {
+        Alert.alert('오류', msg);
+      }
     },
   });
 
   const handleRequestExchange = () => {
-    Alert.alert('교환 요청', `"${book?.title}"에 교환 요청을 보내시겠어요?`, [
-      { text: '취소', style: 'cancel' },
-      { text: '요청하기', onPress: () => exchangeMutation.mutate() },
-    ]);
+    if (Platform.OS === 'web') {
+      if (window.confirm(`"${book?.title}"에 교환 요청을 보내시겠어요?`)) {
+        exchangeMutation.mutate();
+      }
+    } else {
+      Alert.alert('교환 요청', `"${book?.title}"에 교환 요청을 보내시겠어요?`, [
+        { text: '취소', style: 'cancel' },
+        { text: '요청하기', onPress: () => exchangeMutation.mutate() },
+      ]);
+    }
   };
 
   if (isLoading) {
@@ -173,29 +193,31 @@ export default function BookDetailScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* 교환 요청 버튼 */}
-        <View style={styles.actionSection}>
-          <TouchableOpacity
-            style={[
-              styles.exchangeBtn,
-              (book.status !== 'AVAILABLE' || exchangeMutation.isPending) && styles.exchangeBtnDisabled,
-            ]}
-            activeOpacity={0.85}
-            disabled={book.status !== 'AVAILABLE' || exchangeMutation.isPending}
-            onPress={handleRequestExchange}
-          >
-            {exchangeMutation.isPending ? (
-              <ActivityIndicator color="#fff" size="small" />
-            ) : (
-              <>
-                <PMIcon name="swap" size={18} color="#fff" />
-                <Text style={styles.exchangeBtnText}>
-                  {book.status === 'AVAILABLE' ? '교환 요청하기' : '교환 불가'}
-                </Text>
-              </>
-            )}
-          </TouchableOpacity>
-        </View>
+        {/* 교환 요청 버튼 - 내 책이면 숨김 */}
+        {myUserId !== book.owner.id && (
+          <View style={styles.actionSection}>
+            <TouchableOpacity
+              style={[
+                styles.exchangeBtn,
+                (book.status !== 'AVAILABLE' || exchangeMutation.isPending) && styles.exchangeBtnDisabled,
+              ]}
+              activeOpacity={0.85}
+              disabled={book.status !== 'AVAILABLE' || exchangeMutation.isPending}
+              onPress={handleRequestExchange}
+            >
+              {exchangeMutation.isPending ? (
+                <ActivityIndicator color="#fff" size="small" />
+              ) : (
+                <>
+                  <PMIcon name="swap" size={18} color="#fff" />
+                  <Text style={styles.exchangeBtnText}>
+                    {book.status === 'AVAILABLE' ? '교환 요청하기' : '교환 불가'}
+                  </Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -241,11 +263,10 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     overflow: 'hidden',
     flexShrink: 0,
-    shadowColor: '#1A1A2E',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.12,
-    shadowRadius: 12,
-    elevation: 6,
+    ...Platform.select({
+      ios: { shadowColor: '#1A1A2E', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.12, shadowRadius: 12 },
+      android: { elevation: 6 },
+    }),
   },
   coverImg: { width: 140, height: 200, borderRadius: radius.md },
   heroInfo: { flex: 1, justifyContent: 'flex-start', gap: 6 },

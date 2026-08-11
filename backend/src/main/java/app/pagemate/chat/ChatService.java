@@ -5,6 +5,12 @@ import app.pagemate.book.BookRepository;
 import app.pagemate.chat.dto.*;
 import app.pagemate.common.exception.ErrorCode;
 import app.pagemate.common.exception.PagemateException;
+import app.pagemate.common.service.ImageStorage;
+import org.springframework.util.StringUtils;
+import org.springframework.web.multipart.MultipartFile;
+import app.pagemate.exchange.Exchange;
+import app.pagemate.notification.NotificationService;
+import app.pagemate.notification.NotificationType;
 import app.pagemate.user.User;
 import app.pagemate.user.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +32,8 @@ public class ChatService {
     private final UserRepository userRepository;
     private final BookRepository bookRepository;
     private final SimpMessagingTemplate messagingTemplate;
+    private final NotificationService notificationService;
+    private final ImageStorage imageStorage;
 
     @Transactional
     public ChatRoomSummaryResponse createRoom(Long requesterId, Long bookId) {
@@ -82,6 +90,28 @@ public class ChatService {
 
     @Transactional
     public MessageResponse sendMessage(Long senderId, Long roomId, String content) {
+        return persistAndBroadcast(senderId, roomId, content, MessageType.TEXT,
+                content, "님이 메시지를 보냈어요.");
+    }
+
+    /** 이미지 메시지 전송: Cloudinary 업로드 → IMAGE 메시지 저장·브로드캐스트 */
+    @Transactional
+    public MessageResponse sendImageMessage(Long senderId, Long roomId, MultipartFile image) {
+        ChatRoom room = chatRoomRepository.findById(roomId)
+                .orElseThrow(() -> new PagemateException(ErrorCode.CHAT_ROOM_NOT_FOUND));
+        if (!room.isParticipant(senderId)) {
+            throw new PagemateException(ErrorCode.CHAT_ACCESS_DENIED);
+        }
+        String url = imageStorage.upload(image, "chat");
+        if (!StringUtils.hasText(url)) {
+            throw new PagemateException(ErrorCode.IMAGE_UPLOAD_FAILED);
+        }
+        return persistAndBroadcast(senderId, roomId, url, MessageType.IMAGE,
+                "[사진]", "님이 사진을 보냈어요.");
+    }
+
+    private MessageResponse persistAndBroadcast(Long senderId, Long roomId, String content,
+                                                MessageType type, String lastPreview, String notifSuffix) {
         ChatRoom room = chatRoomRepository.findById(roomId)
                 .orElseThrow(() -> new PagemateException(ErrorCode.CHAT_ROOM_NOT_FOUND));
         if (!room.isParticipant(senderId)) {
@@ -95,15 +125,35 @@ public class ChatService {
                 .chatRoom(room)
                 .sender(sender)
                 .content(content)
-                .messageType(MessageType.TEXT)
+                .messageType(type)
                 .build());
 
-        room.updateLastMessage(content);
+        room.updateLastMessage(lastPreview);
         markReadForUser(room.getId(), senderId, message.getId());
 
         MessageResponse response = MessageResponse.of(message);
         messagingTemplate.convertAndSend("/topic/chat/" + roomId, response);
+
+        // 상대방에게 인앱 알림 + 푸시 (referenceId = roomId 로 채팅방 딥링크)
+        User partner = room.getPartner(senderId);
+        notificationService.send(
+                partner.getId(),
+                NotificationType.CHAT_MESSAGE,
+                sender.getNickname() + notifSuffix,
+                roomId
+        );
         return response;
+    }
+
+    /** 채팅방에 연결된 교환 정보 요약 (상단 배너용). 연결된 교환이 없으면 null. */
+    public ExchangeSummaryResponse getRoomExchange(Long userId, Long roomId) {
+        ChatRoom room = chatRoomRepository.findById(roomId)
+                .orElseThrow(() -> new PagemateException(ErrorCode.CHAT_ROOM_NOT_FOUND));
+        if (!room.isParticipant(userId)) {
+            throw new PagemateException(ErrorCode.CHAT_ACCESS_DENIED);
+        }
+        Exchange exchange = room.getExchange();
+        return exchange == null ? null : ExchangeSummaryResponse.of(exchange);
     }
 
     @Transactional

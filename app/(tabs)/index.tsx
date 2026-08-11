@@ -26,6 +26,7 @@ import { CoverColor } from '../../src/features/books/types';
 import { Exchange } from '../../src/features/exchange/types';
 import { storage } from '../../src/lib/storage';
 import { GENRES } from '../../src/constants';
+import { useAuthStore } from '../../src/store';
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 const C = {
@@ -83,9 +84,9 @@ function calcDaysLeft(dueDate: string | null): number | null {
   return Math.ceil((new Date(dueDate).getTime() - Date.now()) / 86400000);
 }
 
-const ActiveExchangeCard = ({ exchange, onChat }: { exchange: Exchange; onChat?: () => void }) => {
+const ActiveExchangeCard = ({ exchange, myUserId, onChat }: { exchange: Exchange; myUserId: number | undefined; onChat?: () => void }) => {
   const daysLeft = calcDaysLeft(exchange.dueDate);
-  const partner = exchange.respondent;
+  const partner = myUserId === exchange.respondent.id ? exchange.requester : exchange.respondent;
   return (
     <TouchableOpacity style={activeExSt.card} activeOpacity={0.85} onPress={onChat}>
       <View style={activeExSt.topRow}>
@@ -542,6 +543,7 @@ const genreSheetSt = StyleSheet.create({
 export default function HomeScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const myUserId = useAuthStore(s => s.user?.id);
   const [showGenreSheet, setShowGenreSheet] = useState(false);
   const [showNeighborhoodSheet, setShowNeighborhoodSheet] = useState(false);
 
@@ -575,8 +577,8 @@ export default function HomeScreen() {
 
   const { data: nearBooks, isLoading: nearLoading } = useQuery({
     queryKey: ['books', 'near', neighborhoodName],
-    queryFn: () => booksApi.getBooks({ sort: 'LATEST', size: 8, neighborhood: neighborhoodName ?? undefined }),
-    enabled: !profileLoading,
+    queryFn: () => booksApi.getBooks({ sort: 'LATEST', size: 8, neighborhood: neighborhoodName! }),
+    enabled: !profileLoading && !!neighborhoodName,
   });
 
   const { data: recentBooks, isLoading: recentLoading } = useQuery({
@@ -635,6 +637,7 @@ export default function HomeScreen() {
               <ActiveExchangeCard
                 key={ex.id}
                 exchange={ex}
+                myUserId={myUserId}
                 onChat={ex.chatRoomId ? () => router.push(`/chat/${ex.chatRoomId}` as any) : undefined}
               />
             ))}
@@ -658,7 +661,7 @@ export default function HomeScreen() {
             sub="2km 내 독자들이 내놓은 책"
             onMore={() => router.push('/search')}
           />
-          {!location && !profileLoading && (
+          {!location && !profileLoading ? (
             <TouchableOpacity
               style={s.locationBanner}
               onPress={() => setShowNeighborhoodSheet(true)}
@@ -671,8 +674,7 @@ export default function HomeScreen() {
               </View>
               <ChevronRight size={14} color={C.primary} />
             </TouchableOpacity>
-          )}
-          {nearLoading ? (
+          ) : nearLoading ? (
             <ActivityIndicator style={{ marginVertical: 32 }} color={C.primary} />
           ) : nearBooks?.content.length ? (
             <ScrollView
@@ -743,7 +745,7 @@ export default function HomeScreen() {
       {/* Share FAB */}
       <TouchableOpacity
         style={s.fab}
-        onPress={() => router.push('/shares/new')}
+        onPress={() => router.push('/share/reading-card' as any)}
         activeOpacity={0.85}
       >
         <ShareIcon />

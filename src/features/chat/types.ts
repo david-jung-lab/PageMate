@@ -1,4 +1,4 @@
-export type MessageType = 'TEXT' | 'SYSTEM';
+export type MessageType = 'TEXT' | 'SYSTEM' | 'IMAGE';
 
 export interface ChatMessage {
   id: number;
@@ -28,4 +28,13 @@ export interface MessageCursorResponse {
   messages: ChatMessage[];
   nextCursor: number | null;
   hasMore: boolean;
+}
+
+export interface ExchangeSummary {
+  exchangeId: number;
+  status: string;
+  firstExchangeDate: string | null;
+  firstExchangePlace: string | null;
+  /** 반납(2차 교환) 기한 — 1차 교환 완료 시 설정 */
+  secondExchangeDueDate: string | null;
 }

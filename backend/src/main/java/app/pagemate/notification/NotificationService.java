@@ -12,6 +12,9 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashMap;
+import java.util.Map;
+
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -19,6 +22,7 @@ public class NotificationService {
 
     private final NotificationRepository notificationRepository;
     private final UserRepository userRepository;
+    private final ExpoPushClient expoPushClient;
 
     public NotificationListResponse getNotifications(Long userId, int page, int size) {
         Page<Notification> result = notificationRepository
@@ -63,5 +67,27 @@ public class NotificationService {
                 .isRead(false)
                 .referenceId(referenceId)
                 .build());
+
+        // 인앱 알림 저장 후, 푸시를 켠 사용자에게만 Expo 푸시 발송 (비동기·실패 무해)
+        if (user.isPushEnabled()) {
+            Map<String, Object> data = new HashMap<>();
+            data.put("type", type.name());
+            if (referenceId != null) data.put("referenceId", referenceId);
+            expoPushClient.send(user.getFcmToken(), pushTitle(type), content, data);
+        }
+    }
+
+    /** 알림 타입 → 푸시 제목 */
+    private String pushTitle(NotificationType type) {
+        return switch (type) {
+            case EXCHANGE_REQUEST   -> "교환 요청";
+            case EXCHANGE_ACCEPTED  -> "교환 수락";
+            case EXCHANGE_REJECTED  -> "교환 거절";
+            case EXCHANGE_COMPLETED -> "교환 완료";
+            case CHAT_MESSAGE       -> "새 메시지";
+            case PLEDGE_REQUESTED   -> "약속 동의";
+            case SECOND_DUE         -> "반납 안내";
+            case REVIEW_REQUESTED   -> "후기 요청";
+        };
     }
 }

@@ -16,8 +16,11 @@ import { useAuthStore } from '../../src/store';
 
 const STATUS_LABELS: Record<ExchangeStatus, string> = {
   PENDING: '요청 중',
-  ACCEPTED: '교환 중',
+  ACCEPTED: '약속 대기',
+  PLEDGED: '일정 확정 대기',
+  SCHEDULED: '교환 예정',
   FIRST_EXCHANGED: '반납 대기',
+  SECOND_EXCHANGED: '평가 대기',
   REJECTED: '거절됨',
   COMPLETED: '완료',
   CANCELLED: '취소됨',
@@ -26,8 +29,11 @@ const STATUS_LABELS: Record<ExchangeStatus, string> = {
 type BadgeVariant = 'warning' | 'primary' | 'danger' | 'success' | 'default';
 const STATUS_VARIANT: Record<ExchangeStatus, BadgeVariant> = {
   PENDING: 'warning',
-  ACCEPTED: 'primary',
+  ACCEPTED: 'warning',
+  PLEDGED: 'primary',
+  SCHEDULED: 'primary',
   FIRST_EXCHANGED: 'warning',
+  SECOND_EXCHANGED: 'warning',
   REJECTED: 'danger',
   COMPLETED: 'success',
   CANCELLED: 'default',
@@ -43,7 +49,9 @@ export default function SwapScreen() {
   const router = useRouter();
   const myUserId = useAuthStore((s) => s.user?.id);
 
-  const activeStatuses: ExchangeStatus[] = ['PENDING', 'ACCEPTED', 'FIRST_EXCHANGED'];
+  const activeStatuses: ExchangeStatus[] = [
+    'PENDING', 'ACCEPTED', 'PLEDGED', 'SCHEDULED', 'FIRST_EXCHANGED', 'SECOND_EXCHANGED',
+  ];
   const doneStatuses: ExchangeStatus[] = ['REJECTED', 'COMPLETED', 'CANCELLED'];
 
   const { data: activeData, isLoading: activeLoading } = useQuery({
@@ -65,7 +73,10 @@ export default function SwapScreen() {
     mutationFn: exchangeApi.completeSecondExchange,
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['exchanges'] });
-      router.push(`/exchanges/${data.id}/review` as any);
+      // 양측 모두 확인되어 SECOND_EXCHANGED로 전환된 경우에만 평가로 이동
+      if (data.status === 'SECOND_EXCHANGED') {
+        router.push(`/exchanges/${data.id}/review` as any);
+      }
     },
     onError: () => Alert.alert('오류', '반납 완료 처리에 실패했어요.'),
   });
@@ -87,20 +98,47 @@ export default function SwapScreen() {
   };
 
   const handleSecondComplete = (id: number) => {
-    Alert.alert('반납 완료', '책을 돌려받으셨나요?', [
-      { text: '취소', style: 'cancel' },
-      { text: '완료', onPress: () => completeSecondMutation.mutate(id) },
-    ]);
+    if (Platform.OS === 'web') {
+      if (window.confirm('책을 돌려받으셨나요?')) {
+        completeSecondMutation.mutate(id);
+      }
+    } else {
+      Alert.alert('반납 완료', '책을 돌려받으셨나요?', [
+        { text: '취소', style: 'cancel' },
+        { text: '완료', onPress: () => completeSecondMutation.mutate(id) },
+      ]);
+    }
   };
 
   const handleCancel = (id: number) => {
-    Alert.alert('요청 취소', '교환 요청을 취소할까요?', [
-      { text: '아니요', style: 'cancel' },
-      { text: '취소하기', style: 'destructive', onPress: () => cancelMutation.mutate(id) },
-    ]);
+    if (Platform.OS === 'web') {
+      if (window.confirm('교환 요청을 취소할까요?')) {
+        cancelMutation.mutate(id);
+      }
+    } else {
+      Alert.alert('요청 취소', '교환 요청을 취소할까요?', [
+        { text: '아니요', style: 'cancel' },
+        { text: '취소하기', style: 'destructive', onPress: () => cancelMutation.mutate(id) },
+      ]);
+    }
   };
 
-  const renderExchange = ({ item }: { item: Exchange }) => (
+  const renderExchange = ({ item }: { item: Exchange }) => {
+    const isRequester = myUserId === item.requester.id;
+    const partner = isRequester ? item.respondent : item.requester;
+    const myBook = isRequester ? item.selectedBook : item.requestedBook;
+    const theirBook = isRequester ? item.requestedBook : item.selectedBook;
+    const theirLabel = isRequester ? '원하는 책' : '상대 책';
+
+    // dual-confirm: 내가 확인했지만 상대가 아직이면 대기 표시
+    const myFirstConfirmed = isRequester ? item.requesterFirstConfirmed : item.respondentFirstConfirmed;
+    const partnerFirstConfirmed = isRequester ? item.respondentFirstConfirmed : item.requesterFirstConfirmed;
+    const mySecondConfirmed = isRequester ? item.requesterSecondConfirmed : item.respondentSecondConfirmed;
+    const partnerSecondConfirmed = isRequester ? item.respondentSecondConfirmed : item.requesterSecondConfirmed;
+    const waitingFirst = myFirstConfirmed && !partnerFirstConfirmed;
+    const waitingSecond = mySecondConfirmed && !partnerSecondConfirmed;
+
+    return (
     <View style={styles.card}>
       <View style={styles.cardHeader}>
         <PMBadge variant={STATUS_VARIANT[item.status]} size="sm">
@@ -112,12 +150,12 @@ export default function SwapScreen() {
       </View>
 
       <View style={styles.booksRow}>
-        {item.selectedBook ? (
+        {myBook ? (
           <BookMini
-            title={item.selectedBook.title}
-            author={item.selectedBook.author}
-            imageUrl={item.selectedBook.imageUrl}
-            coverColor={item.selectedBook.coverColor}
+            title={myBook.title}
+            author={myBook.author}
+            imageUrl={myBook.imageUrl}
+            coverColor={myBook.coverColor}
             label="내 책"
           />
         ) : (
@@ -130,29 +168,39 @@ export default function SwapScreen() {
           </View>
         )}
         <PMIcon name="swap" size={20} color={colors.textTertiary} />
-        <BookMini
-          title={item.requestedBook.title}
-          author={item.requestedBook.author}
-          imageUrl={item.requestedBook.imageUrl}
-          coverColor={item.requestedBook.coverColor}
-          label="원하는 책"
-        />
+        {theirBook ? (
+          <BookMini
+            title={theirBook.title}
+            author={theirBook.author}
+            imageUrl={theirBook.imageUrl}
+            coverColor={theirBook.coverColor}
+            label={theirLabel}
+          />
+        ) : (
+          <View style={styles.bookMini}>
+            <Text style={styles.bookMiniLabel}>{theirLabel}</Text>
+            <View style={styles.bookMiniPlaceholder}>
+              <PMIcon name="swap" size={20} color={colors.borderStrong} />
+            </View>
+            <Text style={styles.bookMiniTitle}>선택 대기 중</Text>
+          </View>
+        )}
       </View>
 
       <View style={styles.partnerRow}>
         <PMAvatar
-          name={item.respondent.nickname}
-          color={item.respondent.avatarColor ?? 'blue'}
+          name={partner.nickname}
+          color={partner.avatarColor ?? 'blue'}
           size={28}
-          imageUrl={item.respondent.profileImage ?? undefined}
         />
-        <Text style={styles.partnerName}>{item.respondent.nickname}</Text>
+        <Text style={styles.partnerName}>{partner.nickname}</Text>
         <Text style={styles.partnerLabel}>와(과) 교환</Text>
       </View>
 
+      {/* PENDING: 요청자는 취소, 응답자는 확인 */}
       {item.status === 'PENDING' && (
         <View style={styles.actions}>
-          {item.respondent.id === myUserId ? (
+          {!isRequester ? (
             <TouchableOpacity
               style={styles.btnPrimary}
               onPress={() => router.push(`/exchanges/${item.id}/respond` as any)}
@@ -167,6 +215,7 @@ export default function SwapScreen() {
         </View>
       )}
 
+      {/* ACCEPTED: 약속문 동의 필요 */}
       {item.status === 'ACCEPTED' && (
         <View style={styles.actions}>
           {item.chatRoomId && (
@@ -174,15 +223,70 @@ export default function SwapScreen() {
               style={styles.btnSecondary}
               onPress={() => router.push(`/chat/${item.chatRoomId}` as any)}
             >
-              <Text style={styles.btnSecondaryText}>채팅방 이동</Text>
+              <Text style={styles.btnSecondaryText}>채팅방</Text>
             </TouchableOpacity>
           )}
-          <TouchableOpacity style={styles.btnPrimary} onPress={() => handleComplete(item.id)}>
-            <Text style={styles.btnPrimaryText}>1차 교환 완료</Text>
+          <TouchableOpacity
+            style={styles.btnPrimary}
+            onPress={() => router.push(`/exchanges/${item.id}/agreement` as any)}
+          >
+            <Text style={styles.btnPrimaryText}>약속문 동의하기</Text>
           </TouchableOpacity>
         </View>
       )}
 
+      {/* PLEDGED: 일정 확정 필요 */}
+      {item.status === 'PLEDGED' && (
+        <View style={styles.actions}>
+          {item.chatRoomId && (
+            <TouchableOpacity
+              style={styles.btnSecondary}
+              onPress={() => router.push(`/chat/${item.chatRoomId}` as any)}
+            >
+              <Text style={styles.btnSecondaryText}>채팅방</Text>
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity
+            style={styles.btnPrimary}
+            onPress={() => router.push(`/exchanges/${item.id}/schedule` as any)}
+          >
+            <Text style={styles.btnPrimaryText}>일정 확정하기</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* SCHEDULED: 1차 교환 완료 */}
+      {item.status === 'SCHEDULED' && (
+        <>
+          {item.firstExchangeDate && (
+            <View style={styles.dueDateRow}>
+              <Text style={styles.dueDateLabel}>
+                만남 일정 · {item.firstExchangeDate}
+                {item.firstExchangePlace ? `  ${item.firstExchangePlace}` : ''}
+              </Text>
+            </View>
+          )}
+          <View style={styles.actions}>
+            {item.chatRoomId && (
+              <TouchableOpacity
+                style={styles.btnSecondary}
+                onPress={() => router.push(`/chat/${item.chatRoomId}` as any)}
+              >
+                <Text style={styles.btnSecondaryText}>채팅방</Text>
+              </TouchableOpacity>
+            )}
+            {waitingFirst ? (
+              <WaitingPill />
+            ) : (
+              <TouchableOpacity style={styles.btnPrimary} onPress={() => handleComplete(item.id)}>
+                <Text style={styles.btnPrimaryText}>1차 교환 완료</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </>
+      )}
+
+      {/* FIRST_EXCHANGED: 반납 완료 */}
       {item.status === 'FIRST_EXCHANGED' && (
         <>
           {item.dueDate && (() => {
@@ -199,14 +303,31 @@ export default function SwapScreen() {
             );
           })()}
           <View style={styles.actions}>
-            <TouchableOpacity style={styles.btnPrimary} onPress={() => handleSecondComplete(item.id)}>
-              <Text style={styles.btnPrimaryText}>반납 완료</Text>
-            </TouchableOpacity>
+            {waitingSecond ? (
+              <WaitingPill />
+            ) : (
+              <TouchableOpacity style={styles.btnPrimary} onPress={() => handleSecondComplete(item.id)}>
+                <Text style={styles.btnPrimaryText}>반납 완료</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </>
       )}
+
+      {/* SECOND_EXCHANGED: 평가하기 */}
+      {item.status === 'SECOND_EXCHANGED' && (
+        <View style={styles.actions}>
+          <TouchableOpacity
+            style={styles.btnPrimary}
+            onPress={() => router.push(`/exchanges/${item.id}/review` as any)}
+          >
+            <Text style={styles.btnPrimaryText}>평가하기</Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
+  };
 
   const dueDate = periodModal
     ? new Date(Date.now() + selectedDays * 86400000).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })
@@ -229,7 +350,6 @@ export default function SwapScreen() {
           <Text style={styles.sheetTitle}>몇 일 후에 책을{'\n'}돌려드릴까요?</Text>
           <Text style={styles.sheetSub}>7일을 권장해요.</Text>
 
-          {/* 슬라이더 (터치 기반 스텝 버튼) */}
           <View style={styles.sliderRow}>
             <TouchableOpacity
               style={styles.stepBtn}
@@ -321,6 +441,15 @@ export default function SwapScreen() {
         />
       )}
     </SafeAreaView>
+  );
+}
+
+function WaitingPill() {
+  return (
+    <View style={styles.waitingPill}>
+      <ActivityIndicator size="small" color={colors.textSecondary} />
+      <Text style={styles.waitingText}>상대방 확인 대기 중...</Text>
+    </View>
   );
 }
 
@@ -439,8 +568,8 @@ const styles = StyleSheet.create({
   },
   btnPrimaryText: { fontSize: 13, fontWeight: '700', color: '#fff' },
   btnSecondary: {
-    flex: 1,
     height: 40,
+    paddingHorizontal: 16,
     backgroundColor: colors.surface,
     borderRadius: radius.md,
     borderWidth: 1,
@@ -458,6 +587,19 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   btnDangerText: { fontSize: 13, fontWeight: '700', color: colors.danger },
+  waitingPill: {
+    flex: 1,
+    height: 40,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: colors.surface2,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+  },
+  waitingText: { fontSize: 13, fontWeight: '600', color: colors.textSecondary },
 
   dueDateRow: {
     flexDirection: 'row',
@@ -468,7 +610,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
-  dueDateLabel: { fontSize: 12, color: colors.textSecondary },
+  dueDateLabel: { fontSize: 12, color: colors.textSecondary, flex: 1 },
   dueDateValue: { fontSize: 12, fontWeight: '700', color: colors.primary },
 
   // 바텀시트

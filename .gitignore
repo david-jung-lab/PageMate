@@ -21,3 +21,6 @@ backend.zip
 
 expo-env.d.ts
 # @end expo-cli
+# runtime artifacts
+*.pid
+*.err

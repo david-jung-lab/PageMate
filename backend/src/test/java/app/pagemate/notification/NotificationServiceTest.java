@@ -33,6 +33,7 @@ class NotificationServiceTest {
 
     @Mock NotificationRepository notificationRepository;
     @Mock UserRepository userRepository;
+    @Mock ExpoPushClient expoPushClient;
 
     @InjectMocks NotificationService service;
 

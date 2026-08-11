@@ -1,3 +1,3 @@
 package app.pagemate.chat;
 
-public enum MessageType { TEXT, SYSTEM }
+public enum MessageType { TEXT, SYSTEM, IMAGE }

@@ -11,6 +11,7 @@ export interface Profile {
   exchangeCount: number;
   averageRating: number;
   reviewCount: number;
+  pushEnabled: boolean;
   createdAt: string;
 }
 
