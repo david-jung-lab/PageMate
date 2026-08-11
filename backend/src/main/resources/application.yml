@@ -63,11 +63,12 @@ oauth:
     ios-client-id: ${GOOGLE_IOS_CLIENT_ID}
 
 # App Store 심사관용 체험 로그인. 공개 엔드포인트이므로 심사 기간에만 켜고,
-# 심사 통과 후 DEMO_LOGIN_ENABLED=false 로 즉시 닫는다.
+# 심사용 데모 로그인. 데모 키는 앱 빌드에도 포함돼 비밀이 아니므로 파일에 기본값으로 둔다.
+# 심사 통과 후 enabled 를 false 로 바꾸거나 DEMO_LOGIN_ENABLED=false 로 즉시 닫는다.
 demo:
   login:
-    enabled: ${DEMO_LOGIN_ENABLED:false}
-    key: ${DEMO_LOGIN_KEY:}
+    enabled: ${DEMO_LOGIN_ENABLED:true}
+    key: ${DEMO_LOGIN_KEY:Vh5Ks2Q-CNeNYHLZnjlqsletbmgeuSji}
 
 springdoc:
   swagger-ui:
