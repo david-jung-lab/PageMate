@@ -17,16 +17,19 @@ public class BookQueryRepository {
 
     private final JPAQueryFactory queryFactory;
 
-    public Page<Book> findBooks(String keyword, String genre, String neighborhood, Pageable pageable) {
+    public Page<Book> findBooks(String keyword, String genre, String neighborhood, String sort, Pageable pageable) {
         QBook book = QBook.book;
         BooleanBuilder builder = buildFilter(keyword, genre, neighborhood);
         builder.and(book.status.eq(BookStatus.AVAILABLE));
         // 탈퇴한 사용자의 도서는 대여 목록에 노출하지 않는다
         builder.and(book.owner.deletedAt.isNull());
 
+        // sort: OLDEST(등록 오래된순) / 그 외는 LATEST(최신순) 기본
+        var order = "OLDEST".equalsIgnoreCase(sort) ? book.createdAt.asc() : book.createdAt.desc();
+
         List<Book> content = queryFactory.selectFrom(book)
                 .where(builder)
-                .orderBy(book.createdAt.desc())
+                .orderBy(order)
                 .offset(pageable.getOffset())
                 .limit(pageable.getPageSize())
                 .fetch();

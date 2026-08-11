@@ -22,12 +22,14 @@ export default function SearchScreen() {
   const [selectedGenre, setSelectedGenre] = useState<string | undefined>();
   const [search, setSearch] = useState('');
   const [focused, setFocused] = useState(false);
+  const [sort, setSort] = useState<'LATEST' | 'OLDEST'>('LATEST');
 
   const { data, isLoading } = useQuery({
-    queryKey: ['books', 'search', search, selectedGenre],
+    queryKey: ['books', 'search', search, selectedGenre, sort],
     queryFn: () => booksApi.getBooks({
       keyword: search || undefined,
       genre: selectedGenre,
+      sort,
       size: 30,
     }),
   });
@@ -119,8 +121,12 @@ export default function SearchScreen() {
                     </>
                   ) : '조건에 맞는 책이 없어요'}
                 </Text>
-                <TouchableOpacity style={styles.sortButton} activeOpacity={0.7}>
-                  <Text style={styles.sortText}>최신순</Text>
+                <TouchableOpacity
+                  style={styles.sortButton}
+                  activeOpacity={0.7}
+                  onPress={() => setSort((s) => (s === 'LATEST' ? 'OLDEST' : 'LATEST'))}
+                >
+                  <Text style={styles.sortText}>{sort === 'LATEST' ? '최신순' : '오래된순'}</Text>
                   <PMIcon name="chevronDown" size={14} color={colors.textSecondary} />
                 </TouchableOpacity>
               </View>
