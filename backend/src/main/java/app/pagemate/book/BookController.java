@@ -43,6 +43,7 @@ public class BookController {
 
     @GetMapping
     public ResponseEntity<ApiResponse<BookPageResponse<BookSummaryResponse>>> getBooks(
+            @AuthenticationPrincipal Long userId,
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) String genre,
             @RequestParam(required = false) String neighborhood,
@@ -51,7 +52,7 @@ public class BookController {
             @RequestParam(defaultValue = "20") @Min(1) @Max(50) int size
     ) {
         return ResponseEntity.ok(ApiResponse.ok(
-                bookService.getBooks(keyword, genre, neighborhood, sort, page, size)));
+                bookService.getBooks(userId, keyword, genre, neighborhood, sort, page, size)));
     }
 
     @GetMapping("/me")
@@ -66,9 +67,10 @@ public class BookController {
 
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<BookDetailResponse>> getBook(
+            @AuthenticationPrincipal Long userId,
             @PathVariable Long id
     ) {
-        return ResponseEntity.ok(ApiResponse.ok(bookService.getBook(id)));
+        return ResponseEntity.ok(ApiResponse.ok(bookService.getBook(userId, id)));
     }
 
     @PatchMapping("/{id}")

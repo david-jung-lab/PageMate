@@ -4,6 +4,7 @@ import app.pagemate.book.BookRepository;
 import app.pagemate.book.BookStatus;
 import app.pagemate.book.dto.BookPageResponse;
 import app.pagemate.book.dto.BookSummaryResponse;
+import app.pagemate.block.BlockService;
 import app.pagemate.book.BookQueryRepository;
 import app.pagemate.common.exception.ErrorCode;
 import app.pagemate.common.exception.PagemateException;
@@ -46,6 +47,7 @@ public class ProfileService {
     private final ReviewRepository reviewRepository;
     private final ExchangeRepository exchangeRepository;
     private final NotificationRepository notificationRepository;
+    private final BlockService blockService;
 
     public ProfileResponse getMyProfile(Long userId) {
         User user = userRepository.findById(userId)
@@ -162,17 +164,19 @@ public class ProfileService {
         user.softDelete();
     }
 
-    public ProfileResponse getUserProfile(Long targetId) {
+    public ProfileResponse getUserProfile(Long viewerId, Long targetId) {
         User user = userRepository.findById(targetId)
                 .orElseThrow(() -> new PagemateException(ErrorCode.USER_NOT_FOUND));
-        if (user.isDeleted()) {
+        // 차단 관계인 상대의 프로필은 노출하지 않는다
+        if (user.isDeleted() || blockService.isBlockedBetween(viewerId, targetId)) {
             throw new PagemateException(ErrorCode.USER_NOT_FOUND);
         }
         return buildProfileResponse(user, targetId);
     }
 
-    public BookPageResponse<BookSummaryResponse> getUserBooks(Long targetId, int page, int size) {
-        if (!userRepository.existsByIdAndDeletedAtIsNull(targetId)) {
+    public BookPageResponse<BookSummaryResponse> getUserBooks(Long viewerId, Long targetId, int page, int size) {
+        if (!userRepository.existsByIdAndDeletedAtIsNull(targetId)
+                || blockService.isBlockedBetween(viewerId, targetId)) {
             throw new PagemateException(ErrorCode.USER_NOT_FOUND);
         }
         return BookPageResponse.of(

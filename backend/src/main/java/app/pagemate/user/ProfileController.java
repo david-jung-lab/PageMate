@@ -97,7 +97,7 @@ public class ProfileController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size
     ) {
-        return ApiResponse.ok(profileService.getUserBooks(userId, page, size));
+        return ApiResponse.ok(profileService.getUserBooks(userId, userId, page, size));
     }
 
     /** 계정 삭제(탈퇴) - App Store 심사 지침 5.1.1(v) */
@@ -108,16 +108,20 @@ public class ProfileController {
     }
 
     @GetMapping("/{id}")
-    public ApiResponse<ProfileResponse> getUserProfile(@PathVariable Long id) {
-        return ApiResponse.ok(profileService.getUserProfile(id));
+    public ApiResponse<ProfileResponse> getUserProfile(
+            @AuthenticationPrincipal Long userId,
+            @PathVariable Long id
+    ) {
+        return ApiResponse.ok(profileService.getUserProfile(userId, id));
     }
 
     @GetMapping("/{id}/books")
     public ApiResponse<BookPageResponse<BookSummaryResponse>> getUserBooks(
+            @AuthenticationPrincipal Long userId,
             @PathVariable Long id,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size
     ) {
-        return ApiResponse.ok(profileService.getUserBooks(id, page, size));
+        return ApiResponse.ok(profileService.getUserBooks(userId, id, page, size));
     }
 }

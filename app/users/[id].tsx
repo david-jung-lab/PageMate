@@ -9,6 +9,7 @@ import PMIcon from '../../src/components/ui/PMIcon';
 import PMAvatar from '../../src/components/ui/PMAvatar';
 import PMBadge from '../../src/components/ui/PMBadge';
 import PMBookCover from '../../src/components/ui/PMBookCover';
+import SafetyMenuButton from '../../src/components/SafetyMenuButton';
 import { profileApi } from '../../src/features/profile/api';
 import { Profile } from '../../src/features/profile/types';
 import { BookSummary } from '../../src/features/books/types';
@@ -52,7 +53,14 @@ export default function UserProfileScreen() {
           <PMIcon name="chevronLeft" size={24} color={colors.text} />
         </TouchableOpacity>
         <Text style={styles.headerHandle}>{profile.handle}</Text>
-        <View style={{ width: 24 }} />
+        <SafetyMenuButton
+          targetType="USER"
+          targetId={userId}
+          targetLabel={profile.nickname ?? undefined}
+          blockUserId={userId}
+          blockUserName={profile.nickname ?? undefined}
+          onBlocked={() => router.back()}
+        />
       </View>
 
       <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>

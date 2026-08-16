@@ -26,4 +26,13 @@ public interface ChatRoomRepository extends JpaRepository<ChatRoom, Long> {
     @Query("SELECT COUNT(r) > 0 FROM ChatRoom r WHERE r.id = :roomId " +
            "AND (r.requester.id = :userId OR r.owner.id = :userId)")
     boolean existsByIdAndParticipant(@Param("roomId") Long roomId, @Param("userId") Long userId);
+
+    /** 해당 방의 상대와 차단 관계(양방향)인지 */
+    @Query("""
+            SELECT COUNT(b) > 0 FROM ChatRoom r, UserBlock b
+            WHERE r.id = :roomId
+              AND ((b.blocker.id = :userId AND b.blocked.id = CASE WHEN r.requester.id = :userId THEN r.owner.id ELSE r.requester.id END)
+                OR (b.blocked.id = :userId AND b.blocker.id = CASE WHEN r.requester.id = :userId THEN r.owner.id ELSE r.requester.id END))
+            """)
+    boolean existsBlockedParticipant(@Param("roomId") Long roomId, @Param("userId") Long userId);
 }

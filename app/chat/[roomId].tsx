@@ -2,7 +2,7 @@ import React, { useState, useCallback, useEffect } from 'react';
 import {
   View, Text, Image, FlatList, TextInput, TouchableOpacity,
   StyleSheet, SafeAreaView, StatusBar, KeyboardAvoidingView,
-  Platform, ActivityIndicator, Alert,
+  Platform, ActivityIndicator, Alert, Pressable,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
@@ -13,6 +13,8 @@ import { chatApi } from '@/features/chat/api';
 import { ChatMessage, ExchangeSummary } from '@/features/chat/types';
 import { useAuthStore } from '@/store/index';
 import { useStompChat } from '@/hooks/useStompChat';
+import SafetyMenuButton from '@/components/SafetyMenuButton';
+import ReportSheet from '@/components/ReportSheet';
 
 function formatTime(iso: string) {
   const d = new Date(iso);
@@ -47,8 +49,12 @@ function SystemBubble({ content }: { content: string }) {
   );
 }
 
-function Bubble({ msg, isMe }: { msg: ChatMessage; isMe: boolean }) {
+function Bubble({ msg, isMe, onReport }: {
+  msg: ChatMessage; isMe: boolean; onReport?: (msg: ChatMessage) => void;
+}) {
   if (msg.messageType === 'SYSTEM') return <SystemBubble content={msg.content} />;
+  // 상대 메시지는 길게 눌러 신고할 수 있다
+  const handleLongPress = isMe || !onReport ? undefined : () => onReport(msg);
   return (
     <View style={[bubbleStyles.row, isMe && bubbleStyles.rowMe]}>
       {!isMe && (
@@ -62,13 +68,15 @@ function Bubble({ msg, isMe }: { msg: ChatMessage; isMe: boolean }) {
         {!isMe && <Text style={bubbleStyles.senderName}>{msg.senderNickname}</Text>}
         <View style={bubbleStyles.bubbleRow}>
           {isMe && <Text style={bubbleStyles.time}>{formatTime(msg.createdAt)}</Text>}
-          {msg.messageType === 'IMAGE' ? (
-            <Image source={{ uri: msg.content }} style={bubbleStyles.image} resizeMode="cover" />
-          ) : (
-            <View style={[bubbleStyles.bubble, isMe ? bubbleStyles.bubbleMe : bubbleStyles.bubbleThem]}>
-              <Text style={[bubbleStyles.text, isMe && bubbleStyles.textMe]}>{msg.content}</Text>
-            </View>
-          )}
+          <Pressable onLongPress={handleLongPress} delayLongPress={400}>
+            {msg.messageType === 'IMAGE' ? (
+              <Image source={{ uri: msg.content }} style={bubbleStyles.image} resizeMode="cover" />
+            ) : (
+              <View style={[bubbleStyles.bubble, isMe ? bubbleStyles.bubbleMe : bubbleStyles.bubbleThem]}>
+                <Text style={[bubbleStyles.text, isMe && bubbleStyles.textMe]}>{msg.content}</Text>
+              </View>
+            )}
+          </Pressable>
           {!isMe && <Text style={bubbleStyles.time}>{formatTime(msg.createdAt)}</Text>}
         </View>
       </View>
@@ -161,6 +169,17 @@ export default function ChatRoomScreen() {
   });
   const banner = buildExchangeBanner(exchangeSummary);
 
+  // 헤더의 신고·차단 메뉴에 쓸 상대 정보
+  const { data: rooms } = useQuery({
+    queryKey: ['chat-rooms'],
+    queryFn: chatApi.getRooms,
+    staleTime: 60 * 1000,
+  });
+  const room = rooms?.find(r => r.id === Number(roomId));
+
+  // 길게 눌러 신고할 메시지
+  const [reportMessage, setReportMessage] = useState<ChatMessage | null>(null);
+
   // 읽음 처리
   useEffect(() => {
     chatApi.markAsRead(Number(roomId)).catch(() => {});
@@ -242,8 +261,19 @@ export default function ChatRoomScreen() {
         <TouchableOpacity style={styles.backBtn} onPress={() => router.back()} activeOpacity={0.7}>
           <PMIcon name="chevronRight" size={20} color={colors.text} strokeWidth={2} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>채팅</Text>
-        <View style={{ width: 36 }} />
+        <Text style={styles.headerTitle}>{room?.partnerNickname ?? '채팅'}</Text>
+        {room ? (
+          <SafetyMenuButton
+            targetType="USER"
+            targetId={room.partnerId}
+            targetLabel={room.partnerNickname}
+            blockUserId={room.partnerId}
+            blockUserName={room.partnerNickname}
+            onBlocked={() => router.back()}
+          />
+        ) : (
+          <View style={{ width: 36 }} />
+        )}
       </View>
 
       {/* 교환 일정 고정 배너 */}
@@ -264,7 +294,11 @@ export default function ChatRoomScreen() {
           inverted
           keyExtractor={m => String(m.id)}
           renderItem={({ item }) => (
-            <Bubble msg={item} isMe={item.senderId === myUserId} />
+            <Bubble
+              msg={item}
+              isMe={item.senderId === myUserId}
+              onReport={setReportMessage}
+            />
           )}
           contentContainerStyle={styles.listContent}
           onEndReached={loadMore}
@@ -311,6 +345,15 @@ export default function ChatRoomScreen() {
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
+
+      {/* 메시지를 길게 눌렀을 때 뜨는 신고 시트 */}
+      <ReportSheet
+        visible={!!reportMessage}
+        targetType="MESSAGE"
+        targetId={reportMessage?.id ?? 0}
+        targetLabel={reportMessage?.senderNickname ?? undefined}
+        onClose={() => setReportMessage(null)}
+      />
     </SafeAreaView>
   );
 }

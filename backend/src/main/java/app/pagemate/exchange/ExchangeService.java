@@ -1,5 +1,6 @@
 package app.pagemate.exchange;
 
+import app.pagemate.block.BlockService;
 import app.pagemate.book.Book;
 import app.pagemate.book.BookRepository;
 import app.pagemate.book.BookStatus;
@@ -38,6 +39,7 @@ public class ExchangeService {
     private final ChatRoomRepository chatRoomRepository;
     private final MessageRepository messageRepository;
     private final NotificationService notificationService;
+    private final BlockService blockService;
 
     @Transactional
     public ExchangeResponse createExchange(Long requesterId, ExchangeCreateRequest req) {
@@ -47,6 +49,8 @@ public class ExchangeService {
         if (targetBook.getOwner().getId().equals(requesterId)) {
             throw new PagemateException(ErrorCode.SELF_EXCHANGE);
         }
+        // 차단 관계면 새 대여 요청을 보낼 수 없다
+        blockService.assertNotBlocked(requesterId, targetBook.getOwner().getId());
         if (targetBook.getStatus() != BookStatus.AVAILABLE) {
             throw new PagemateException(ErrorCode.BOOK_NOT_AVAILABLE);
         }

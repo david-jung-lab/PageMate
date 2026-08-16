@@ -10,6 +10,7 @@ import org.springframework.stereotype.Repository;
 import org.springframework.util.StringUtils;
 
 import java.util.List;
+import java.util.Set;
 
 @Repository
 @RequiredArgsConstructor
@@ -17,12 +18,17 @@ public class BookQueryRepository {
 
     private final JPAQueryFactory queryFactory;
 
-    public Page<Book> findBooks(String keyword, String genre, String neighborhood, String sort, Pageable pageable) {
+    public Page<Book> findBooks(String keyword, String genre, String neighborhood, String sort,
+                                Set<Long> excludeOwnerIds, Pageable pageable) {
         QBook book = QBook.book;
         BooleanBuilder builder = buildFilter(keyword, genre, neighborhood);
         builder.and(book.status.eq(BookStatus.AVAILABLE));
         // 탈퇴한 사용자의 도서는 대여 목록에 노출하지 않는다
         builder.and(book.owner.deletedAt.isNull());
+        // 차단 관계인 사용자의 도서도 서로 보이지 않게 한다
+        if (excludeOwnerIds != null && !excludeOwnerIds.isEmpty()) {
+            builder.and(book.owner.id.notIn(excludeOwnerIds));
+        }
 
         // sort: OLDEST(등록 오래된순) / 그 외는 LATEST(최신순) 기본
         var order = "OLDEST".equalsIgnoreCase(sort) ? book.createdAt.asc() : book.createdAt.desc();

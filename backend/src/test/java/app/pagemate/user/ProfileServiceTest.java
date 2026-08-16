@@ -1,6 +1,7 @@
 package app.pagemate.user;
 
 import app.pagemate.auth.OAuthProvider;
+import app.pagemate.block.BlockService;
 import app.pagemate.book.BookQueryRepository;
 import app.pagemate.book.BookRepository;
 import app.pagemate.common.exception.ErrorCode;
@@ -46,6 +47,7 @@ class ProfileServiceTest {
     @Mock ReviewRepository reviewRepository;
     @Mock ExchangeRepository exchangeRepository;
     @Mock NotificationRepository notificationRepository;
+    @Mock BlockService blockService;
 
     @InjectMocks ProfileService profileService;
 
@@ -208,7 +210,7 @@ class ProfileServiceTest {
             given(userRepository.findById(1L)).willReturn(Optional.of(user));
             given(bookRepository.countByOwnerId(1L)).willReturn(5);
 
-            ProfileResponse res = profileService.getUserProfile(1L);
+            ProfileResponse res = profileService.getUserProfile(2L, 1L);
 
             assertThat(res.nickname()).isEqualTo("김독서");
             assertThat(res.bookCount()).isEqualTo(5);
@@ -219,7 +221,7 @@ class ProfileServiceTest {
         void notFound() {
             given(userRepository.findById(99L)).willReturn(Optional.empty());
 
-            assertThatThrownBy(() -> profileService.getUserProfile(99L))
+            assertThatThrownBy(() -> profileService.getUserProfile(2L, 99L))
                     .isInstanceOf(PagemateException.class)
                     .extracting(e -> ((PagemateException) e).getErrorCode())
                     .isEqualTo(ErrorCode.USER_NOT_FOUND);
@@ -240,7 +242,7 @@ class ProfileServiceTest {
             given(bookQueryRepository.findMyBooks(eq(1L), isNull(), any()))
                     .willReturn(new PageImpl<>(Collections.emptyList(), PageRequest.of(0, 20), 0));
 
-            var result = profileService.getUserBooks(1L, 0, 20);
+            var result = profileService.getUserBooks(1L, 1L, 0, 20);
 
             assertThat(result.content()).isEmpty();
             assertThat(result.totalElements()).isZero();
@@ -251,7 +253,7 @@ class ProfileServiceTest {
         void userNotFound() {
             given(userRepository.existsByIdAndDeletedAtIsNull(99L)).willReturn(false);
 
-            assertThatThrownBy(() -> profileService.getUserBooks(99L, 0, 20))
+            assertThatThrownBy(() -> profileService.getUserBooks(2L, 99L, 0, 20))
                     .isInstanceOf(PagemateException.class)
                     .extracting(e -> ((PagemateException) e).getErrorCode())
                     .isEqualTo(ErrorCode.USER_NOT_FOUND);

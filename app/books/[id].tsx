@@ -11,6 +11,7 @@ import PMIcon from '../../src/components/ui/PMIcon';
 import PMBookCover from '../../src/components/ui/PMBookCover';
 import PMBadge from '../../src/components/ui/PMBadge';
 import PMAvatar from '../../src/components/ui/PMAvatar';
+import SafetyMenuButton from '../../src/components/SafetyMenuButton';
 import { booksApi } from '../../src/features/books/api';
 import { exchangeApi } from '../../src/features/exchange/api';
 import { STATUS_LABELS, GENRE_LABELS } from '../../src/constants';
@@ -104,7 +105,18 @@ export default function BookDetailScreen() {
           <PMIcon name="chevronRight" size={20} color={colors.text} strokeWidth={2} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>도서 상세</Text>
-        <View style={{ width: 36 }} />
+        {book.owner.id !== myUserId ? (
+          <SafetyMenuButton
+            targetType="BOOK"
+            targetId={book.id}
+            targetLabel={book.title}
+            blockUserId={book.owner.id}
+            blockUserName={book.owner.nickname}
+            onBlocked={() => router.back()}
+          />
+        ) : (
+          <View style={{ width: 36 }} />
+        )}
       </View>
 
       <ScrollView

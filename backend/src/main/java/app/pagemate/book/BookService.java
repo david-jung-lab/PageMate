@@ -1,5 +1,6 @@
 package app.pagemate.book;
 
+import app.pagemate.block.BlockService;
 import app.pagemate.book.dto.*;
 import app.pagemate.common.exception.ErrorCode;
 import app.pagemate.common.exception.PagemateException;
@@ -24,6 +25,7 @@ public class BookService {
     private final UserRepository userRepository;
     private final ReviewRepository reviewRepository;
     private final ExchangeRepository exchangeRepository;
+    private final BlockService blockService;
 
     @Transactional
     public BookDetailResponse createBook(Long userId, BookCreateRequest req) {
@@ -48,15 +50,23 @@ public class BookService {
     }
 
     public BookPageResponse<BookSummaryResponse> getBooks(
-            String keyword, String genre, String neighborhood, String sort, int page, int size
+            Long viewerId, String keyword, String genre, String neighborhood, String sort, int page, int size
     ) {
-        Page<Book> bookPage = bookQueryRepository.findBooks(keyword, genre, neighborhood, sort, PageRequest.of(page, size));
+        Page<Book> bookPage = bookQueryRepository.findBooks(
+                keyword, genre, neighborhood, sort,
+                blockService.getInvisibleUserIds(viewerId),
+                PageRequest.of(page, size));
         return BookPageResponse.of(bookPage, BookSummaryResponse::of);
     }
 
-    public BookDetailResponse getBook(Long bookId) {
+    public BookDetailResponse getBook(Long viewerId, Long bookId) {
         Book book = bookRepository.findById(bookId)
                 .orElseThrow(() -> new PagemateException(ErrorCode.BOOK_NOT_FOUND));
+
+        // 차단 관계인 사용자의 도서는 상세도 열람할 수 없다
+        if (blockService.isBlockedBetween(viewerId, book.getOwner().getId())) {
+            throw new PagemateException(ErrorCode.BOOK_NOT_FOUND);
+        }
         return buildBookDetailResponse(book, book.getOwner().getId());
     }
 

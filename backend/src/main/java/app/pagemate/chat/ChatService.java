@@ -1,5 +1,6 @@
 package app.pagemate.chat;
 
+import app.pagemate.block.BlockService;
 import app.pagemate.book.Book;
 import app.pagemate.book.BookRepository;
 import app.pagemate.chat.dto.*;
@@ -20,6 +21,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -34,11 +36,15 @@ public class ChatService {
     private final SimpMessagingTemplate messagingTemplate;
     private final NotificationService notificationService;
     private final ImageStorage imageStorage;
+    private final BlockService blockService;
 
     @Transactional
     public ChatRoomSummaryResponse createRoom(Long requesterId, Long bookId) {
         Book book = bookRepository.findById(bookId)
                 .orElseThrow(() -> new PagemateException(ErrorCode.BOOK_NOT_FOUND));
+
+        // 차단 관계면 새 대화를 시작할 수 없다
+        blockService.assertNotBlocked(requesterId, book.getOwner().getId());
 
         return chatRoomRepository.findByBookIdAndRequesterId(bookId, requesterId)
                 .map(room -> {
@@ -60,7 +66,10 @@ public class ChatService {
     }
 
     public List<ChatRoomSummaryResponse> getRooms(Long userId) {
+        // 차단 관계인 상대와의 채팅방은 목록에서 숨긴다
+        Set<Long> hidden = blockService.getInvisibleUserIds(userId);
         return chatRoomRepository.findAllByUserId(userId).stream()
+                .filter(room -> !hidden.contains(room.getPartner(userId).getId()))
                 .map(room -> {
                     long unread = getUnreadCount(room.getId(), userId);
                     return ChatRoomSummaryResponse.of(room, userId, unread);
@@ -69,11 +78,7 @@ public class ChatService {
     }
 
     public MessageCursorResponse getMessages(Long userId, Long roomId, Long cursor, int size) {
-        ChatRoom room = chatRoomRepository.findById(roomId)
-                .orElseThrow(() -> new PagemateException(ErrorCode.CHAT_ROOM_NOT_FOUND));
-        if (!room.isParticipant(userId)) {
-            throw new PagemateException(ErrorCode.CHAT_ACCESS_DENIED);
-        }
+        getAccessibleRoom(userId, roomId);
 
         List<Message> messages = messageRepository.findByRoomIdWithCursor(
                 roomId, cursor, PageRequest.of(0, size + 1));
@@ -97,11 +102,7 @@ public class ChatService {
     /** 이미지 메시지 전송: Cloudinary 업로드 → IMAGE 메시지 저장·브로드캐스트 */
     @Transactional
     public MessageResponse sendImageMessage(Long senderId, Long roomId, MultipartFile image) {
-        ChatRoom room = chatRoomRepository.findById(roomId)
-                .orElseThrow(() -> new PagemateException(ErrorCode.CHAT_ROOM_NOT_FOUND));
-        if (!room.isParticipant(senderId)) {
-            throw new PagemateException(ErrorCode.CHAT_ACCESS_DENIED);
-        }
+        getAccessibleRoom(senderId, roomId);
         String url = imageStorage.upload(image, "chat");
         if (!StringUtils.hasText(url)) {
             throw new PagemateException(ErrorCode.IMAGE_UPLOAD_FAILED);
@@ -112,11 +113,7 @@ public class ChatService {
 
     private MessageResponse persistAndBroadcast(Long senderId, Long roomId, String content,
                                                 MessageType type, String lastPreview, String notifSuffix) {
-        ChatRoom room = chatRoomRepository.findById(roomId)
-                .orElseThrow(() -> new PagemateException(ErrorCode.CHAT_ROOM_NOT_FOUND));
-        if (!room.isParticipant(senderId)) {
-            throw new PagemateException(ErrorCode.CHAT_ACCESS_DENIED);
-        }
+        ChatRoom room = getAccessibleRoom(senderId, roomId);
 
         User sender = userRepository.findById(senderId)
                 .orElseThrow(() -> new PagemateException(ErrorCode.USER_NOT_FOUND));
@@ -147,24 +144,33 @@ public class ChatService {
 
     /** 채팅방에 연결된 교환 정보 요약 (상단 배너용). 연결된 교환이 없으면 null. */
     public ExchangeSummaryResponse getRoomExchange(Long userId, Long roomId) {
-        ChatRoom room = chatRoomRepository.findById(roomId)
-                .orElseThrow(() -> new PagemateException(ErrorCode.CHAT_ROOM_NOT_FOUND));
-        if (!room.isParticipant(userId)) {
-            throw new PagemateException(ErrorCode.CHAT_ACCESS_DENIED);
-        }
+        ChatRoom room = getAccessibleRoom(userId, roomId);
         Exchange exchange = room.getExchange();
         return exchange == null ? null : ExchangeSummaryResponse.of(exchange);
     }
 
     @Transactional
     public void markAsRead(Long userId, Long roomId) {
+        getAccessibleRoom(userId, roomId);
+        messageRepository.findLatestByRoomId(roomId)
+                .ifPresent(latest -> markReadForUser(roomId, userId, latest.getId()));
+    }
+
+    /**
+     * 채팅방 접근 권한 확인.
+     * 참여자여야 하고, 상대와 차단 관계가 아니어야 한다. 차단된 뒤에는 방 id 를 직접 알더라도
+     * 대화 열람·전송이 모두 막혀야 차단이 괴롭힘 차단 수단으로 실효를 가진다.
+     */
+    private ChatRoom getAccessibleRoom(Long userId, Long roomId) {
         ChatRoom room = chatRoomRepository.findById(roomId)
                 .orElseThrow(() -> new PagemateException(ErrorCode.CHAT_ROOM_NOT_FOUND));
         if (!room.isParticipant(userId)) {
             throw new PagemateException(ErrorCode.CHAT_ACCESS_DENIED);
         }
-        messageRepository.findLatestByRoomId(roomId)
-                .ifPresent(latest -> markReadForUser(roomId, userId, latest.getId()));
+        if (blockService.isBlockedBetween(userId, room.getPartner(userId).getId())) {
+            throw new PagemateException(ErrorCode.BLOCKED_USER);
+        }
+        return room;
     }
 
     private void initParticipants(ChatRoom room, User requester, User owner) {

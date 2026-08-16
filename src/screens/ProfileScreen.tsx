@@ -477,6 +477,10 @@ const ProfileScreen: React.FC = () => {
                 }
               />
               <SettingsRow
+                title="차단한 사용자"
+                onPress={() => router.push('/settings/blocked')}
+              />
+              <SettingsRow
                 danger
                 hideArrow
                 title="로그아웃"

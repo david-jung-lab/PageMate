@@ -43,6 +43,15 @@ public enum ErrorCode {
     REVIEW_NOT_FOUND("평가를 찾을 수 없습니다.", HttpStatus.NOT_FOUND),
     REVIEW_ALREADY_EXISTS("이미 평가를 남기셨습니다.", HttpStatus.CONFLICT),
 
+    // Report
+    REPORT_TARGET_NOT_FOUND("신고 대상을 찾을 수 없습니다.", HttpStatus.NOT_FOUND),
+    SELF_REPORT("본인은 신고할 수 없습니다.", HttpStatus.BAD_REQUEST),
+    DUPLICATE_REPORT("이미 신고한 대상입니다.", HttpStatus.CONFLICT),
+
+    // Block
+    SELF_BLOCK("본인은 차단할 수 없습니다.", HttpStatus.BAD_REQUEST),
+    BLOCKED_USER("차단된 사용자입니다.", HttpStatus.FORBIDDEN),
+
     // Common
     VALIDATION_ERROR("요청 값 검증에 실패했습니다.", HttpStatus.BAD_REQUEST),
     NOT_FOUND("리소스를 찾을 수 없습니다.", HttpStatus.NOT_FOUND),
