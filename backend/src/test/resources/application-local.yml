@@ -1,0 +1,55 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;MODE=MySQL;NON_KEYWORDS=VALUE
+    username: sa
+    password: ""
+    driver-class-name: org.h2.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+    show-sql: false
+
+  flyway:
+    enabled: false
+
+  security:
+    oauth2:
+      client:
+        registration:
+          kakao:
+            client-id: test-kakao-client-id
+            client-secret: test-kakao-client-secret
+          google:
+            client-id: test-google-client-id
+            client-secret: test-google-client-secret
+
+jwt:
+  # 테스트 전용 더미 키 (운영 JWT_SECRET 과 무관)
+  secret: 5dedd1055b73514c0ffad3feeafab1ad1f87b18a14af6e3f9100471ec0a65706
+
+kakao:
+  api-key: test-kakao-api-key
+
+aws:
+  s3:
+    bucket: test-bucket
+    region: ap-northeast-2
+  access-key: ""
+  secret-key: ""
+
+oauth:
+  kakao:
+    redirect-uri: http://localhost:8080/login/oauth2/code/kakao
+  google:
+    redirect-uri: http://localhost:8080/login/oauth2/code/google
+    android-client-id: test-android
+    ios-client-id: test-ios
+
+logging:
+  level:
+    app.pagemate: WARN
+    org.hibernate.SQL: WARN

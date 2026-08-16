@@ -7,3 +7,5 @@ bin/
 .env
 application-local.yml
 application-secret.yml
+# 테스트용 H2 설정은 시크릿이 없고 CI 에서 필요하므로 예외로 추적한다
+!src/test/resources/application-local.yml
