@@ -34,6 +34,8 @@ public enum ErrorCode {
     CHAT_ROOM_NOT_FOUND("채팅방을 찾을 수 없습니다.", HttpStatus.NOT_FOUND),
     CHAT_ACCESS_DENIED("채팅방 참여자만 접근할 수 있습니다.", HttpStatus.FORBIDDEN),
     IMAGE_UPLOAD_FAILED("이미지 업로드에 실패했습니다.", HttpStatus.INTERNAL_SERVER_ERROR),
+    INVALID_IMAGE_TYPE("이미지 파일만 업로드할 수 있습니다.", HttpStatus.BAD_REQUEST),
+    IMAGE_TOO_LARGE("이미지 용량이 너무 큽니다. (최대 5MB)", HttpStatus.PAYLOAD_TOO_LARGE),
 
     // Notification
     NOTIFICATION_NOT_FOUND("알림을 찾을 수 없습니다.", HttpStatus.NOT_FOUND),

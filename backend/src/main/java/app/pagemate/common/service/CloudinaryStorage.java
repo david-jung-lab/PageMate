@@ -1,5 +1,7 @@
 package app.pagemate.common.service;
 
+import app.pagemate.common.exception.ErrorCode;
+import app.pagemate.common.exception.PagemateException;
 import com.cloudinary.Cloudinary;
 import com.cloudinary.utils.ObjectUtils;
 import lombok.extern.slf4j.Slf4j;
@@ -9,6 +11,7 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -32,9 +35,17 @@ public class CloudinaryStorage implements ImageStorage {
         }
     }
 
+    /** 허용 이미지 MIME 타입 (iOS 는 HEIC/HEIF 로 올라올 수 있다) */
+    private static final Set<String> ALLOWED_TYPES = Set.of(
+            "image/jpeg", "image/jpg", "image/png", "image/webp", "image/gif",
+            "image/heic", "image/heif"
+    );
+    private static final long MAX_BYTES = 5L * 1024 * 1024;
+
     @Override
     public String upload(MultipartFile file, String folder) {
         if (!enabled || file == null || file.isEmpty()) return null;
+        validate(file);
         try {
             Map<?, ?> result = cloudinary.uploader().upload(
                     file.getBytes(),
@@ -48,6 +59,21 @@ public class CloudinaryStorage implements ImageStorage {
         } catch (Exception e) {
             log.warn("Cloudinary 업로드 실패 (folder={}): {}", folder, e.getMessage());
             return null;
+        }
+    }
+
+    /**
+     * 업로드 전 1차 검증. 클라이언트가 보낸 Content-Type 은 위조할 수 있으므로
+     * 최종 판정은 Cloudinary(resource_type=image)가 하지만, 명백히 잘못된 요청은
+     * 외부 호출 비용을 쓰기 전에 여기서 끊는다.
+     */
+    private void validate(MultipartFile file) {
+        if (file.getSize() > MAX_BYTES) {
+            throw new PagemateException(ErrorCode.IMAGE_TOO_LARGE);
+        }
+        String contentType = file.getContentType();
+        if (contentType == null || !ALLOWED_TYPES.contains(contentType.toLowerCase())) {
+            throw new PagemateException(ErrorCode.INVALID_IMAGE_TYPE);
         }
     }
 
