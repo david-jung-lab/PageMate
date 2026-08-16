@@ -125,7 +125,7 @@
 | 작업 | 구분 |
 |------|------|
 | notifications 테이블 설계 | DB |
-| FCM 발송 로직 (Firebase Admin SDK) | BE |
+| 푸시 발송 로직 (Expo Push, exp.host) | BE |
 | 교환 · 채팅 이벤트 알림 트리거 | BE |
 | 알림 목록 · 읽음 처리 API | BE |
 | FCM 수신 설정 (expo-notifications) | FE |

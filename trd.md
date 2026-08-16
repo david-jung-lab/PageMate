@@ -52,7 +52,7 @@ RESTful API 서버 및 WebSocket 채팅 서버를 Spring Boot 3로 구성한다.
 | MapStruct | latest | Entity ↔ DTO 변환 |
 | JWT (jjwt) | 0.12+ | Access/Refresh Token 발급 |
 | AWS SDK v2 | latest | S3 이미지 업로드 |
-| Firebase Admin SDK | 9.x | FCM 푸시 알림 발송 |
+| Expo Push (exp.host) | HTTP API | 푸시 알림 발송 (RestClient 직접 호출, 별도 SDK 없음) |
 
 ### 1.3 Database — MySQL
 
@@ -72,7 +72,7 @@ RESTful API 서버 및 WebSocket 채팅 서버를 Spring Boot 3로 구성한다.
 |------|------|------|
 | Storage | AWS S3 + CloudFront | 도서 이미지 저장 및 CDN |
 | 인증 | OAuth 2.0 (카카오, 구글) | 소셜 로그인 |
-| 푸시 알림 | FCM (Firebase) | Android + iOS 통합 푸시 |
+| 푸시 알림 | Expo Push (exp.host) | Android + iOS 통합 푸시, APNs/FCM 라우팅은 Expo가 대행 |
 | 실시간 채팅 | WebSocket (STOMP) | 1:1 채팅 |
 | BE 배포 (MVP) | Railway | jar 업로드 자동 배포 |
 | BE 배포 (이후) | AWS EC2 + Docker | 운영 환경 전환 |
@@ -277,8 +277,6 @@ aws:
   access-key: ${AWS_ACCESS_KEY}
   secret-key: ${AWS_SECRET_KEY}
 
-firebase:
-  credentials-path: ${FIREBASE_CREDENTIALS_PATH}
 ```
 
 ### 7.2 Frontend (`.env`)

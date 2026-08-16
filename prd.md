@@ -115,7 +115,7 @@ PageMate는 비슷한 독서 취향을 가진 사용자들이 서로의 책을 �
 | Storage | AWS S3 + CloudFront | 도서 이미지 저장 및 CDN |
 | 인증 | OAuth 2.0 (카카오, 구글) + JWT | 소셜 로그인, Spring Security 연동 |
 | 실시간 채팅 | WebSocket (STOMP) | Spring Boot 내장, 별도 인프라 불필요 |
-| 푸시 알림 | FCM (Firebase) | Android + iOS 통합 푸시 |
+| 푸시 알림 | Expo Push (exp.host) | Android + iOS 통합 푸시, 별도 Firebase 설정 불필요 |
 | 앱 배포 | Expo EAS Build | iOS/Android 스토어 자동 배포 |
 
 ---
