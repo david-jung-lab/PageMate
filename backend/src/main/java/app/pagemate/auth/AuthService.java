@@ -3,6 +3,7 @@ package app.pagemate.auth;
 import app.pagemate.auth.client.GoogleOAuthClient;
 import app.pagemate.auth.client.KakaoOAuthClient;
 import app.pagemate.auth.dto.AuthResponse;
+import app.pagemate.auth.dto.DemoAccountsResponse;
 import app.pagemate.common.exception.ErrorCode;
 import app.pagemate.common.exception.PagemateException;
 import app.pagemate.common.security.JwtProvider;
@@ -16,15 +17,12 @@ import org.springframework.util.StringUtils;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.util.List;
 import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
 public class AuthService {
-
-    /** Apple App Store 심사용 데모 계정 식별자 (V16 시드 마이그레이션과 일치) */
-    private static final OAuthProvider DEMO_PROVIDER = OAuthProvider.GOOGLE;
-    private static final String DEMO_OAUTH_ID = "demo-reviewer-apple";
 
     private final UserRepository userRepository;
     private final JwtProvider jwtProvider;
@@ -38,6 +36,17 @@ public class AuthService {
     private String demoLoginKey;
 
     /**
+     * 체험 로그인 가용 여부. 앱은 이 응답을 보고 로그인 화면의 체험 버튼 노출을 결정하므로,
+     * 심사 통과 후 서버에서 DEMO_LOGIN_ENABLED 를 내리면 앱 재빌드 없이 버튼이 사라진다.
+     */
+    public DemoAccountsResponse getDemoAccounts() {
+        if (!demoLoginEnabled) {
+            return DemoAccountsResponse.unavailable();
+        }
+        return DemoAccountsResponse.of(List.of(DemoAccount.values()));
+    }
+
+    /**
      * 심사관용 데모 로그인: 시드된 데모 계정으로 즉시 토큰 발급.
      * 공개 엔드포인트이므로 DEMO_LOGIN_ENABLED 가 켜진 심사 기간에만 열리며,
      * 심사 통과 후에는 플래그를 내려 완전히 닫는다.
@@ -46,7 +55,7 @@ public class AuthService {
      * (키를 보내지 않는 기존 제출 빌드와의 호환을 위해 키 미설정 시에는 검사하지 않는다)
      */
     @Transactional
-    public AuthResponse loginAsDemo(String providedKey) {
+    public AuthResponse loginAsDemo(String providedKey, DemoAccount account) {
         if (!demoLoginEnabled) {
             throw new PagemateException(ErrorCode.DEMO_LOGIN_DISABLED);
         }
@@ -54,7 +63,11 @@ public class AuthService {
             throw new PagemateException(ErrorCode.DEMO_LOGIN_DISABLED);
         }
 
-        User user = userRepository.findByOauthProviderAndOauthId(DEMO_PROVIDER, DEMO_OAUTH_ID)
+        // 계정을 지정하지 않은 기존 제출 빌드는 요청자 계정으로 로그인시킨다
+        DemoAccount target = account != null ? account : DemoAccount.BORROWER;
+
+        User user = userRepository
+                .findByOauthProviderAndOauthId(target.getProvider(), target.getOauthId())
                 .orElseThrow(() -> new PagemateException(ErrorCode.USER_NOT_FOUND));
         return issueTokens(user, false);
     }

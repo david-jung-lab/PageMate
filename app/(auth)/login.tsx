@@ -15,6 +15,7 @@ import { router } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { makeRedirectUri, useAuthRequest, ResponseType } from 'expo-auth-session';
 import { authApi } from '@/features/auth/api';
+import type { DemoAccount, DemoAccountKey } from '@/features/auth/types';
 import { useAuthStore } from '@/store/index';
 import {
   API_BASE_URL,
@@ -94,11 +95,21 @@ const SocialButton = ({ bg, color, logo, label, onPress, loading }: SocialButton
 // ─── Screen ──────────────────────────────────────────────────────────────────
 export default function LoginScreen() {
   const setAuth = useAuthStore((s) => s.setAuth);
-  const [loading, setLoading] = React.useState<'google' | 'kakao' | 'demo' | null>(null);
+  const [loading, setLoading] = React.useState<'google' | 'kakao' | DemoAccountKey | null>(null);
+
+  // 체험 계정은 서버가 열어둔 동안에만 노출한다.
+  // 심사 통과 후 서버에서 닫으면 앱 재빌드 없이 버튼이 사라진다.
+  const [demoAccounts, setDemoAccounts] = React.useState<DemoAccount[]>([]);
 
   useEffect(() => {
     console.log('[Google OAuth] redirectUri:', googleRedirectUri);
     console.log('[Kakao OAuth] redirectUri:', kakaoNativeRedirectUri);
+  }, []);
+
+  useEffect(() => {
+    authApi.getDemoAccounts()
+      .then((res) => setDemoAccounts(res.available ? res.accounts : []))
+      .catch(() => setDemoAccounts([]));
   }, []);
 
   // ── Google OAuth ─────────────────────────────────────────────────────────
@@ -188,10 +199,11 @@ export default function LoginScreen() {
   };
 
   // ── 데모(체험) 로그인 ─ Apple 심사관용 ───────────────────────────────────
-  const handleDemo = async () => {
-    setLoading('demo');
+  // 1:1 대여 서비스라 요청자·소유자 양쪽 계정을 모두 제공해야 흐름을 끝까지 볼 수 있다.
+  const handleDemo = async (account: DemoAccountKey) => {
+    setLoading(account);
     try {
-      const res = await authApi.loginDemo();
+      const res = await authApi.loginDemo(account);
       const { accessToken, refreshToken, user } = res.data.data;
       await setAuth(accessToken, refreshToken, user);
       router.replace('/(tabs)');
@@ -271,30 +283,40 @@ export default function LoginScreen() {
           loading={loading === 'kakao'}
         />
 
-        {/* 체험(데모) 로그인 — 심사 기간에만 키가 주입되어 노출된다 */}
-        {!!DEMO_LOGIN_KEY && (
+        {/* 체험(데모) 로그인 — 서버가 열어둔 동안에만 노출된다 (App Store 심사용) */}
+        {demoAccounts.length > 0 && (
           <>
             <View style={styles.dividerRow}>
               <View style={styles.dividerLine} />
-              <Text style={styles.dividerText}>또는</Text>
+              <Text style={styles.dividerText}>체험 계정으로 둘러보기</Text>
               <View style={styles.dividerLine} />
             </View>
 
-            <Pressable
-              onPress={handleDemo}
-              disabled={!!loading}
-              style={({ pressed }) => [
-                styles.demoBtn,
-                pressed && styles.socialBtnPressed,
-                loading === 'demo' && { opacity: 0.7 },
-              ]}
-            >
-              {loading === 'demo' ? (
-                <ActivityIndicator size="small" color={WHITE} />
-              ) : (
-                <Text style={styles.demoBtnText}>둘러보기 (체험 계정으로 시작)</Text>
-              )}
-            </Pressable>
+            <Text style={styles.demoHint}>
+              PageMate는 이웃끼리 책을 빌려주는 서비스입니다.
+              양쪽 입장을 모두 체험하려면 두 계정을 번갈아 사용해보세요.
+            </Text>
+
+            {demoAccounts.map((acc) => (
+              <Pressable
+                key={acc.key}
+                onPress={() => handleDemo(acc.key)}
+                disabled={!!loading}
+                style={({ pressed }) => [
+                  styles.demoBtn,
+                  pressed && styles.socialBtnPressed,
+                  loading === acc.key && { opacity: 0.7 },
+                ]}
+              >
+                {loading === acc.key ? (
+                  <ActivityIndicator size="small" color={WHITE} />
+                ) : (
+                  <Text style={styles.demoBtnText}>
+                    {acc.nickname}으로 시작 · {acc.role}
+                  </Text>
+                )}
+              </Pressable>
+            ))}
           </>
         )}
       </View>
@@ -410,6 +432,13 @@ const styles = StyleSheet.create({
   dividerText: {
     fontSize: 12,
     color: 'rgba(250,250,248,0.4)',
+  },
+  demoHint: {
+    fontSize: 12,
+    lineHeight: 18,
+    textAlign: 'center',
+    color: 'rgba(250,250,248,0.5)',
+    marginBottom: 2,
   },
   demoBtn: {
     height: 54,

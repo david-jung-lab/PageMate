@@ -1,6 +1,7 @@
 package app.pagemate.auth;
 
 import app.pagemate.auth.dto.AuthResponse;
+import app.pagemate.auth.dto.DemoAccountsResponse;
 import app.pagemate.auth.dto.OAuthRequest;
 import app.pagemate.auth.dto.RefreshRequest;
 import app.pagemate.common.response.ApiResponse;
@@ -40,12 +41,22 @@ public class AuthController {
         return ApiResponse.ok(authService.loginWithGoogle(request.getAuthorizationCode(), request.getRedirectUri()));
     }
 
-    /** Apple App Store 심사관용 데모 로그인 (시드된 체험 계정으로 즉시 로그인) */
+    /** 체험 로그인 가용 여부 + 선택 가능한 계정 목록 (앱이 버튼 노출을 결정하는 데 사용) */
+    @GetMapping("/demo/accounts")
+    public ApiResponse<DemoAccountsResponse> demoAccounts() {
+        return ApiResponse.ok(authService.getDemoAccounts());
+    }
+
+    /**
+     * Apple App Store 심사관용 데모 로그인.
+     * account 를 지정하면 해당 역할(요청자/소유자)의 시드 계정으로 로그인한다.
+     */
     @PostMapping("/demo")
     public ApiResponse<AuthResponse> demoLogin(
-            @RequestHeader(value = "X-Demo-Key", required = false) String demoKey
+            @RequestHeader(value = "X-Demo-Key", required = false) String demoKey,
+            @RequestParam(required = false) DemoAccount account
     ) {
-        return ApiResponse.ok(authService.loginAsDemo(demoKey));
+        return ApiResponse.ok(authService.loginAsDemo(demoKey, account));
     }
 
     @PostMapping("/refresh")

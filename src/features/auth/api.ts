@@ -1,6 +1,8 @@
 import { api } from '@/lib/api';
 import { DEMO_LOGIN_KEY } from '@/constants';
-import type { AuthResponse, RefreshResponse } from './types';
+import type {
+  AuthResponse, RefreshResponse, DemoAccountKey, DemoAccountsResponse,
+} from './types';
 
 interface ApiWrapper<T> {
   success: boolean;
@@ -22,10 +24,15 @@ export const authApi = {
   loginWithKakao: (authorizationCode: string, redirectUri: string) =>
     api.post<ApiWrapper<AuthResponse>>('/v1/auth/oauth/kakao', { authorizationCode, redirectUri }),
 
+  // 체험 로그인 가용 여부 + 계정 목록. 서버에서 닫으면 available=false 가 되어 버튼이 사라진다.
+  getDemoAccounts: () =>
+    api.get<ApiWrapper<DemoAccountsResponse>>('/v1/auth/demo/accounts').then(r => r.data.data),
+
   // Apple App Store 심사관용 데모 로그인 (체험 계정)
-  loginDemo: () =>
+  loginDemo: (account?: DemoAccountKey) =>
     api.post<ApiWrapper<AuthResponse>>('/v1/auth/demo', undefined, {
       headers: { 'X-Demo-Key': DEMO_LOGIN_KEY },
+      params: account ? { account } : undefined,
     }),
 
   refresh: (refreshToken: string) =>
