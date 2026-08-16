@@ -1,5 +1,6 @@
 package app.pagemate.common.security;
 
+import app.pagemate.user.UserRepository;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -17,6 +18,7 @@ import java.util.List;
 public class JwtAuthFilter extends OncePerRequestFilter {
 
     private final JwtProvider jwtProvider;
+    private final UserRepository userRepository;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
@@ -25,8 +27,11 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         String token = resolveToken(request);
         if (StringUtils.hasText(token) && jwtProvider.isValid(token)) {
             Long userId = jwtProvider.getUserId(token);
-            var auth = new UsernamePasswordAuthenticationToken(userId, null, List.of());
-            SecurityContextHolder.getContext().setAuthentication(auth);
+            // 탈퇴한 계정의 토큰은 만료 전이라도 즉시 무효로 취급한다
+            if (userRepository.existsByIdAndDeletedAtIsNull(userId)) {
+                var auth = new UsernamePasswordAuthenticationToken(userId, null, List.of());
+                SecurityContextHolder.getContext().setAuthentication(auth);
+            }
         }
         chain.doFilter(request, response);
     }

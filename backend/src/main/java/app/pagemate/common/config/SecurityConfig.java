@@ -2,6 +2,7 @@ package app.pagemate.common.config;
 
 import app.pagemate.common.security.JwtAuthFilter;
 import app.pagemate.common.security.JwtProvider;
+import app.pagemate.user.UserRepository;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
@@ -26,6 +27,7 @@ import java.util.List;
 public class SecurityConfig {
 
     private final JwtProvider jwtProvider;
+    private final UserRepository userRepository;
 
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
@@ -53,8 +55,11 @@ public class SecurityConfig {
                 })
             )
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/v1/auth/oauth/**", "/v1/auth/refresh", "/v1/auth/demo").permitAll()
+                .requestMatchers("/v1/auth/oauth/**", "/v1/auth/refresh", "/v1/auth/demo/**", "/v1/auth/demo").permitAll()
                 .requestMatchers("/v1/auth/logout").authenticated()
+                // 외부(카카오) 도서 검색은 비용이 드는 호출이라 로그인 사용자에게만 연다.
+                // 이 규칙이 아래 /books/** 개방보다 먼저 와야 적용된다.
+                .requestMatchers(HttpMethod.GET, "/books/search/kakao").authenticated()
                 .requestMatchers(HttpMethod.GET, "/books/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/v1/users/me", "/v1/users/me/books").authenticated()
                 .requestMatchers(HttpMethod.GET, "/v1/users/*/books", "/v1/users/*").permitAll()
@@ -63,7 +68,7 @@ public class SecurityConfig {
                 .requestMatchers("/ws/**", "/ws-native/**").permitAll()
                 .anyRequest().authenticated()
             )
-            .addFilterBefore(new JwtAuthFilter(jwtProvider),
+            .addFilterBefore(new JwtAuthFilter(jwtProvider, userRepository),
                     UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }

@@ -81,6 +81,10 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
         if (!chatRoomRepository.existsByIdAndParticipant(roomId, userId)) {
             throw new MessageDeliveryException("채팅방 참여자가 아닙니다.");
         }
+        // 차단 관계가 되면 기존 참여자였더라도 실시간 수신을 끊는다
+        if (chatRoomRepository.existsBlockedParticipant(roomId, userId)) {
+            throw new MessageDeliveryException("차단된 사용자와의 대화입니다.");
+        }
     }
 
     private Long currentUserId(StompHeaderAccessor accessor) {
