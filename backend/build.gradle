@@ -50,7 +50,7 @@ dependencies {
     // 이미지 저장소: Cloudinary (업로드 시 CDN URL 반환)
     implementation 'com.cloudinary:cloudinary-http44:1.39.0'
 
-    // 푸시 알림: Expo Push(exp.host)로 발송 — firebase-admin 불필요 (RestClient 사용)
+    // 푸시 알림: Expo Push(exp.host) HTTP 호출로 발송 — 별도 SDK 의존성 없음 (RestClient 사용)
 
     // Lombok
     compileOnly 'org.projectlombok:lombok'

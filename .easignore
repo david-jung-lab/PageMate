@@ -1,4 +1,12 @@
-backend/.gradle
-backend/build
-backend/bin
+# EAS 빌드에는 앱(Expo) 소스만 필요하다.
+# 주의: .easignore 가 있으면 EAS CLI 는 .gitignore 를 무시하고 이 파일만 적용한다.
+# 따라서 .gitignore 로 막아둔 시크릿도 여기서 다시 제외해야 한다.
+
+# 백엔드 전체 — 앱 빌드에 불필요하고, application-local.yml 에 DB/JWT/OAuth 시크릿이 들어 있다
+backend/
+
 node_modules
+
+# 기획·설계 문서
+docs/
+*.md
