@@ -155,7 +155,11 @@ const styles = StyleSheet.create({
   },
   logoRow: {
     flexDirection: 'row',
-    alignItems: 'baseline',
+    // baseline 정렬은 Yoga 가 자식 baseline 을 재귀 탐색하는데,
+    // 초기 width 0 + overflow hidden 인 Animated.View 가 섞이면
+    // 레이아웃 계산 중 죽는 경우가 있어 flex-end 로 맞춘다.
+    // 글자들의 fontSize·lineHeight 가 같아 시각적 결과는 동일하다.
+    alignItems: 'flex-end',
   },
   logoText: {
     fontFamily: FONT,
