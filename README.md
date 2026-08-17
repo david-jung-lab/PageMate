@@ -100,7 +100,7 @@ flowchart LR
 
 ---
 
-## 5. 핵심 기술 의사결정 (Why)
+## 5. 핵심 기술 의사결정 
 
 > 각 결정의 상세 배경·트레이드오프는 **[docs/PORTFOLIO.md](docs/PORTFOLIO.md)** 에 정리했습니다.
 
