@@ -31,7 +31,7 @@
 |------|------|
 | 플랫폼 | iOS / Android (React Native · Expo) |
 | 배포 | 백엔드 Railway 운영, iOS App Store 심사 제출 |
-| 팀 구성 | 2인 (본인: **백엔드·인프라·배포 주담** + 프론트 다수 기능 구현) |
+| 팀 구성 | 2인 — 역할 분담은 아래 **9. 팀 & 역할** 참고 |
 
 > **심사관/체험용 로그인**: 소셜 로그인(구글·카카오) 전용 앱이라, 앱 스토어 심사 및 데모를 위해 시드 데이터가 채워진 계정으로 즉시 로그인하는 **데모 로그인 경로**를 별도 설계했습니다.
 
@@ -115,7 +115,7 @@ flowchart LR
 
 ---
 
-## 6. 트러블슈팅 (발췌)
+## 6. 트러블슈팅
 
 - **EAS iOS 빌드 `fmt consteval` 실패** — `image:latest`가 Xcode 26을 당겨와 RN 0.76 번들 `fmt`와 충돌. Expo SDK에 맞는 Xcode 이미지 고정 + config plugin 패치로 해결. (App Store `90725 SDK version` 대응 포함)
 - **CI 도입 중 잠복 테스트 2건 적발** — H2 테스트 스키마엔 `ON DELETE CASCADE`가 없어 teardown FK 위반, 신규 의존성 목킹 누락 NPE. CI가 없어 여태 안 걸리던 것을 파이프라인 구축으로 발견·수정.
@@ -160,13 +160,12 @@ CI: `push`/`PR` 시 GitHub Actions가 백엔드 테스트(H2)+커버리지, 프�
 
 ---
 
-## 9. 담당 역할 (본인)
+## 9. 팀 & 역할
 
-2인 팀에서 **백엔드·인프라·배포**를 주도적으로 담당했습니다.
-
-- **서버 아키텍처 전반** — 도메인 패키지 설계, Spring Security + JWT, WebSocket/STOMP 인증, QueryDSL 동적 쿼리, Flyway 스키마 관리(21개 마이그레이션)
-- **인프라·배포** — Railway 배포, Cloudinary/Expo Push 연동, GitHub Actions CI 구축, App Store 심사 대응(데모 로그인·SDK 이슈)
-- **프론트 기능 구현** — 온보딩, 채팅 이미지 전송, 푸시 알림 등록·딥링크, 알림 설정 등 다수 화면을 직접 구현 (풀스택 역량)
+| 멤버 | 담당 |
+|------|------|
+| **손재이** ([@wo2ek8](https://github.com/wo2ek8)) | **백엔드·인프라·배포 주담당** — 도메인 패키지 설계, Spring Security + JWT, WebSocket/STOMP 인증, QueryDSL 동적 쿼리, Flyway 스키마 관리(21개 마이그레이션), Railway 배포, Cloudinary/Expo Push 연동, GitHub Actions CI, App Store 심사 대응(데모 로그인·SDK 이슈) + 프론트 다수 기능(온보딩, 채팅 이미지, 푸시 등록·딥링크) |
+| **정우협** ([@david-jung-lab](https://github.com/david-jung-lab)) | **프론트엔드 주담당** — 화면·UX 전반(홈·마이페이지·도서 등록/상세), 소셜 로그인 클라이언트 연동, 교환-채팅 화면 연동 |
 
 ---
 
