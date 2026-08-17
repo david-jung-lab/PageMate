@@ -136,7 +136,7 @@ PageMate/
 │       ├── notification/       # 인앱 + Expo Push
 │       ├── review/ user/ location/
 │       └── common/             # security · config · service(ImageStorage)
-│   └── src/main/resources/db/migration/   # Flyway V1~V19
+│   └── src/main/resources/db/migration/   # Flyway V1~V21
 ├── app/                        # Expo Router 화면
 ├── src/                        # features · lib · store · components
 └── .github/workflows/ci.yml    # CI (BE test+jacoco / FE tsc)
@@ -164,7 +164,7 @@ CI: `push`/`PR` 시 GitHub Actions가 백엔드 테스트(H2)+커버리지, 프�
 
 2인 팀에서 **백엔드·인프라·배포**를 주도적으로 담당했습니다.
 
-- **서버 아키텍처 전반** — 도메인 패키지 설계, Spring Security + JWT, WebSocket/STOMP 인증, QueryDSL 동적 쿼리, Flyway 스키마 관리(19개 마이그레이션)
+- **서버 아키텍처 전반** — 도메인 패키지 설계, Spring Security + JWT, WebSocket/STOMP 인증, QueryDSL 동적 쿼리, Flyway 스키마 관리(21개 마이그레이션)
 - **인프라·배포** — Railway 배포, Cloudinary/Expo Push 연동, GitHub Actions CI 구축, App Store 심사 대응(데모 로그인·SDK 이슈)
 - **프론트 기능 구현** — 온보딩, 채팅 이미지 전송, 푸시 알림 등록·딥링크, 알림 설정 등 다수 화면을 직접 구현 (풀스택 역량)
 
