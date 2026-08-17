@@ -169,4 +169,4 @@ CI: `push`/`PR` 시 GitHub Actions가 백엔드 테스트(H2)+커버리지, 프�
 
 ---
 
-<sub>📎 기술 심층 문서(의사결정·트러블슈팅): <b>docs/PORTFOLIO.md</b></sub>
+<sub>📎 기술 심층 문서(의사결정·트러블슈팅): <a href="docs/PORTFOLIO.md"><b>docs/PORTFOLIO.md</b></a></sub>
