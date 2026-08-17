@@ -10,7 +10,13 @@
   <img alt="React Native" src="https://img.shields.io/badge/React%20Native-0.76-61DAFB?logo=react&logoColor=black">
   <img alt="Expo" src="https://img.shields.io/badge/Expo-52-000020?logo=expo&logoColor=white">
   <img alt="deploy" src="https://img.shields.io/badge/Deploy-Railway-0B0D0E?logo=railway&logoColor=white">
-  <img alt="status" src="https://img.shields.io/badge/App%20Store-심사중-blue?logo=appstore&logoColor=white">
+  <img alt="status" src="https://img.shields.io/badge/App%20Store-심사%20제출-blue?logo=appstore&logoColor=white">
+</p>
+
+<p align="center">
+  <img alt="홈 — 내 주변 독자의 책장 탐색" src="docs/assets/readme/home.webp" width="260">
+  <img alt="교환독서 약속 — 신뢰 기반 약속문 동의" src="docs/assets/readme/pledge.webp" width="260">
+  <img alt="채팅 — 약속부터 완료까지 관리" src="docs/assets/readme/chat.webp" width="260">
 </p>
 
 ---
@@ -24,7 +30,7 @@
 | 구분 | 내용 |
 |------|------|
 | 플랫폼 | iOS / Android (React Native · Expo) |
-| 배포 | 백엔드 Railway 운영, iOS App Store 심사 중 |
+| 배포 | 백엔드 Railway 운영, iOS App Store 심사 제출 |
 | 팀 구성 | 2인 (본인: **백엔드·인프라·배포 주담** + 프론트 다수 기능 구현) |
 
 > **심사관/체험용 로그인**: 소셜 로그인(구글·카카오) 전용 앱이라, 앱 스토어 심사 및 데모를 위해 시드 데이터가 채워진 계정으로 즉시 로그인하는 **데모 로그인 경로**를 별도 설계했습니다.
@@ -96,7 +102,7 @@ flowchart LR
 
 ## 5. 핵심 기술 의사결정 (Why)
 
-> 포트폴리오에서 가장 강조하고 싶은 부분. 상세 근거·트레이드오프는 **[docs/PORTFOLIO.md](docs/PORTFOLIO.md)** 참고.
+> 각 결정의 상세 배경·트레이드오프는 **[docs/PORTFOLIO.md](docs/PORTFOLIO.md)** 에 정리했습니다.
 
 | 결정 | 요약 | 근거 |
 |------|------|------|
@@ -164,4 +170,4 @@ CI: `push`/`PR` 시 GitHub Actions가 백엔드 테스트(H2)+커버리지, 프�
 
 ---
 
-<sub>📎 기술 심층·의사결정·면접 대비: <b>docs/PORTFOLIO.md</b></sub>
+<sub>📎 기술 심층 문서(의사결정·트러블슈팅): <b>docs/PORTFOLIO.md</b></sub>
